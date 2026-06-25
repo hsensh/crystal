@@ -1,0 +1,20 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.4 system-ui, sans-serif; color: #e5e7eb; background: #0f172a; }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #1e293b; }
+h1 { font-size: 16px; margin: 0; }
+main { display: flex; height: calc(100vh - 52px); }
+#sidebar { width: 260px; border-right: 1px solid #334155; padding: 10px; overflow: auto; }
+#workspace { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+#waveform { background: #1e293b; border-radius: 6px; min-height: 160px; }
+#track-list { list-style: none; padding: 0; margin: 12px 0 0; }
+#track-list li { padding: 8px; border-radius: 4px; cursor: pointer; }
+#track-list li.active { background: #2563eb; }
+#track-list li.error { color: #f87171; }
+.notice { color: #fbbf24; font-size: 12px; }
+.hidden { display: none; }
+button { background: #334155; color: #e5e7eb; border: 0; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+button.active { background: #2563eb; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+input { background: #0f172a; color: #e5e7eb; border: 1px solid #334155; padding: 6px; border-radius: 4px; width: 100%; }
+#params { display: flex; flex-wrap: wrap; gap: 12px; }
+#params label { display: flex; flex-direction: column; font-size: 12px; gap: 4px; }

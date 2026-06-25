@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dialogue Cleaner</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Dialogue Cleaner</h1>
+    <div id="mode-toggle">
+      <button data-mode="normal" class="active">Normal</button>
+      <button data-mode="merge" id="merge-btn">Merge</button>
+    </div>
+    <span id="merge-notice" class="notice hidden"></span>
+  </header>
+  <main>
+    <aside id="sidebar">
+      <div class="loader">
+        <input id="paths" placeholder="paste folder or file paths, comma-separated">
+        <button id="load-btn">Load</button>
+      </div>
+      <ul id="track-list"></ul>
+    </aside>
+    <section id="workspace">
+      <div id="waveform"></div>
+      <div id="transport">
+        <button id="play">▶ space</button>
+        <button id="ab">A/B (a)</button>
+        <span id="status"></span>
+      </div>
+      <div id="params"></div>
+      <div id="actions">
+        <button id="render">Render (r)</button>
+        <button id="render-all">Render all (⇧R)</button>
+        <button id="export">Export (e)</button>
+      </div>
+    </section>
+  </main>
+  <div id="shortcuts" class="hidden"></div>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
