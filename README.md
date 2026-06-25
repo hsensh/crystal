@@ -5,9 +5,24 @@ tune params live, A/B compare, and save outputs. All free / open-source, CPU-onl
 
 ## Run
 ```bash
-.venv/bin/python app.py
-# opens http://127.0.0.1:7860
+./run.sh            # or: .venv/bin/python -m uvicorn server:app --port 7860
+# open http://127.0.0.1:7860
 ```
+
+## Dialogue Cleaner
+Local web app. Load a recording (folder / files), clean per-track (Normal) or
+fuse all mics into one master (Merge). WaveSurfer waveform with drag-trim + zoom.
+
+**Flows**
+- **Normal** — each track its own method/params (global default + per-track
+  override). `Render` one, `⇧R` render all (failures isolated + flagged).
+- **Merge** — gain-share fusion of sample-locked mics → one mono master, then the
+  selected denoise. Disabled (with a notice) when files aren't one session.
+
+**Shortcuts** — space play · `[ ]` zoom · `← →` seek · `i o` trim · `r` render ·
+`⇧R` all · `n p` track · `m` merge · `a` A/B · `e` export · `?` help.
+
+Outputs → `output/<normal|merge>/<name>.wav` (24-bit / 48 kHz).
 
 ## Tracks (`files/`)
 4× 48 kHz / 24-bit, 121 s. `Tr1`, `Tr3`, `TrA` = mono mics; `TrLR` = stereo.
