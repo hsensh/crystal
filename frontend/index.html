@@ -8,37 +8,91 @@
 </head>
 <body>
   <header>
-    <h1>Dialogue Cleaner</h1>
-    <div id="mode-toggle">
-      <button data-mode="normal" class="active">Normal</button>
-      <button data-mode="merge" id="merge-btn">Merge</button>
+    <div class="brand">
+      <span class="logo">◑</span>
+      <div>
+        <h1>Dialogue Cleaner</h1>
+        <p class="sub">import a recording · clean tracks · or fuse mics into one voice</p>
+      </div>
     </div>
-    <span id="merge-notice" class="notice hidden"></span>
+    <div class="mode" id="mode-toggle">
+      <button data-mode="normal" class="active">Clean tracks</button>
+      <button data-mode="merge" id="merge-btn">Merge mics</button>
+    </div>
+    <button id="help-btn" class="ghost" title="Keyboard shortcuts">⌨ shortcuts</button>
   </header>
+
   <main>
     <aside id="sidebar">
-      <div class="loader">
-        <input id="paths" placeholder="paste folder or file paths, comma-separated">
-        <button id="load-btn">Load</button>
+      <div id="dropzone" class="dropzone">
+        <div class="dz-icon">⬇</div>
+        <div class="dz-text">Drop a folder or WAV files</div>
+        <div class="dz-sub">or</div>
+        <div class="dz-buttons">
+          <button id="pick-files" class="primary sm">Choose files</button>
+          <button id="pick-folder" class="sm">Choose folder</button>
+        </div>
+        <input id="file-input" type="file" accept="audio/wav,.wav,.WAV" multiple hidden>
+        <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
       </div>
+      <div id="session-badge" class="badge hidden"></div>
       <ul id="track-list"></ul>
     </aside>
+
     <section id="workspace">
-      <div id="waveform"></div>
-      <div id="transport">
-        <button id="play">▶ space</button>
-        <button id="ab">A/B (a)</button>
-        <span id="status"></span>
+      <div id="empty-state" class="empty">
+        <div class="empty-icon">◑</div>
+        <h2>No recording loaded</h2>
+        <p>Drop your shoot's WAV tracks (or the folder) on the left.<br>
+           Your project's <code>files/</code> folder loads automatically.</p>
       </div>
-      <div id="params"></div>
-      <div id="actions">
-        <button id="render">Render (r)</button>
-        <button id="render-all">Render all (⇧R)</button>
-        <button id="export">Export (e)</button>
+
+      <div id="editor" class="hidden">
+        <div class="wave-card">
+          <div class="wave-head">
+            <span id="now-track" class="now-track">—</span>
+            <div class="ab" id="ab-toggle">
+              <button data-ab="orig" class="active">Original</button>
+              <button data-ab="clean" id="ab-clean" disabled>Cleaned</button>
+            </div>
+          </div>
+          <div id="waveform"></div>
+          <div class="transport">
+            <button id="play" class="round" title="Play / pause (space)">▶</button>
+            <div class="zoom">
+              <button id="zoom-out" title="Zoom out ([)">－</button>
+              <button id="zoom-in" title="Zoom in (])">＋</button>
+            </div>
+            <span class="hint">drag on waveform to select a region · <b>i</b>/<b>o</b> set in/out</span>
+            <button id="clear-trim" class="ghost sm">clear trim</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3 id="panel-title">Cleanup</h3>
+            <span id="status" class="status"></span>
+          </div>
+          <div id="params" class="params"></div>
+          <div class="actions">
+            <button id="render" class="primary">Render <kbd>r</kbd></button>
+            <button id="render-all" class="hidden-merge">Render all tracks <kbd>⇧R</kbd></button>
+            <button id="export" class="ghost">Export <kbd>e</kbd></button>
+          </div>
+          <div id="result" class="result hidden"></div>
+        </div>
       </div>
     </section>
   </main>
-  <div id="shortcuts" class="hidden"></div>
+
+  <div id="shortcuts" class="overlay hidden">
+    <div class="overlay-card">
+      <h3>Keyboard shortcuts</h3>
+      <div id="shortcuts-body"></div>
+      <button id="close-help" class="primary sm">Close</button>
+    </div>
+  </div>
+
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -14,7 +14,9 @@ import processing as P
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND = os.path.join(ROOT, "frontend")
+FILES_DIR = os.path.join(ROOT, "files")
 SAFE_ROOTS = (ROOT, tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir()))
+UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "dialogue-cleaner-uploads")
 
 app = FastAPI(title="Dialogue Cleaner")
 
@@ -41,6 +43,36 @@ class SessionReq(BaseModel):
 @app.post("/api/session")
 def session(req: SessionReq):
     return fusion.scan_session(req.paths)
+
+
+@app.get("/api/default_session")
+def default_session():
+    """Auto-load the project's files/ dir on startup so the user sees tracks
+    immediately without typing a path."""
+    if not os.path.isdir(FILES_DIR):
+        return {"tracks": [], "mergeable": False, "reason": "no files/ dir"}
+    return fusion.scan_session([FILES_DIR])
+
+
+@app.post("/api/upload")
+async def upload(files: list[UploadFile] = File(...)):
+    """Accept dropped/picked files, store them in a fresh temp session dir,
+    return the scanned session. Lets the UI work by drag-drop or folder pick."""
+    import uuid
+    sess_dir = os.path.join(UPLOAD_ROOT, uuid.uuid4().hex[:8])
+    os.makedirs(sess_dir, exist_ok=True)
+    paths = []
+    for f in files:
+        name = os.path.basename(f.filename or "track.wav")
+        if not name.lower().endswith(".wav"):
+            continue
+        dest = os.path.join(sess_dir, name)
+        with open(dest, "wb") as out:
+            shutil.copyfileobj(f.file, out)
+        paths.append(dest)
+    if not paths:
+        raise HTTPException(400, "no .wav files in upload")
+    return fusion.scan_session(paths)
 
 
 @app.get("/api/audio")
