@@ -20,3 +20,10 @@ def test_audio_endpoint_streams(write_wav, sine_track):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("audio/")
     assert len(r.content) > 1000
+
+
+def test_audio_endpoint_rejects_path_traversal():
+    c = TestClient(server.app)
+    r = c.get("/api/audio", params={"path": "/etc/passwd"})
+    assert r.status_code == 403
+    assert "path outside allowed roots" in r.json()["detail"]

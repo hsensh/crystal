@@ -17,9 +17,15 @@ SAFE_ROOTS = (ROOT, tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir(
 app = FastAPI(title="Dialogue Cleaner")
 
 
+def _under(rp, root):
+    """Check if rp is exactly root or strictly inside it (separator-aware)."""
+    root = os.path.realpath(root)
+    return rp == root or rp.startswith(root + os.sep)
+
+
 def _safe(path):
     rp = os.path.realpath(path)
-    if not any(rp.startswith(os.path.realpath(r)) for r in SAFE_ROOTS):
+    if not any(_under(rp, r) for r in SAFE_ROOTS):
         raise HTTPException(403, "path outside allowed roots")
     if not os.path.isfile(rp):
         raise HTTPException(404, "file not found")
@@ -42,7 +48,10 @@ def audio(path: str = Query(...)):
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(FRONTEND, "index.html"))
+    index_path = os.path.join(FRONTEND, "index.html")
+    if not os.path.isfile(index_path):
+        raise HTTPException(404, "frontend not built")
+    return FileResponse(index_path)
 
 
 if os.path.isdir(FRONTEND):
