@@ -92,7 +92,7 @@ function num(label, min, max, step, value, onchange) {
 }
 
 function currentTrim() {
-  const r = Object.values(regions.getRegions())[0];
+  const r = regions.getRegions()[0];
   return r ? [r.start, r.end] : [0, 0];
 }
 
@@ -100,14 +100,18 @@ async function renderFocus() {
   const t = state.tracks[state.focus];
   const e = effective(state.focus);
   $('#status').textContent = 'rendering…';
-  const res = await api('/api/render', {
-    path: t.path, method: e.method, params: e.params,
-    trim: currentTrim(), mode: 'normal',
-  });
-  state.cleaned[state.focus] = res.out_path;
-  $('#status').textContent =
-    `noise floor ${res.before.noise_floor_dbfs.toFixed(1)} → ${res.after.noise_floor_dbfs.toFixed(1)} dB`;
-  toggleAB(true);
+  try {
+    const res = await api('/api/render', {
+      path: t.path, method: e.method, params: e.params,
+      trim: currentTrim(), mode: 'normal',
+    });
+    state.cleaned[state.focus] = res.out_path;
+    $('#status').textContent =
+      `noise floor ${res.before.noise_floor_dbfs.toFixed(1)} → ${res.after.noise_floor_dbfs.toFixed(1)} dB`;
+    toggleAB(true);
+  } catch (err) {
+    $('#status').textContent = 'error: ' + err.message;
+  }
 }
 
 function toggleAB(showCleaned) {
@@ -145,7 +149,102 @@ async function loadSession() {
 
 $('#load-btn').onclick = loadSession;
 $('#play').onclick = () => ws.playPause();
-$('#render').onclick = renderFocus;
+$('#render').onclick = () => (state.mode === 'merge' ? renderMerge() : renderFocus());
 $('#ab').onclick = () => toggleAB(!state.showCleaned);
+
+async function renderAll() {
+  const tracks = state.tracks.map((t, i) => {
+    const e = effective(i);
+    return { path: t.path, method: e.method, params: e.params,
+             trim: [0, 0], mode: 'normal' };
+  });
+  $('#status').textContent = 'rendering all…';
+  try {
+    const res = await api('/api/render_all', { tracks });
+    res.results.forEach((r, i) => { if (r.ok) state.cleaned[i] = r.out_path; });
+    // mark failures in the list
+    const lis = document.querySelectorAll('#track-list li');
+    res.results.forEach((r, i) => { if (!r.ok && lis[i]) lis[i].classList.add('error'); });
+    const fails = res.results.filter((r) => !r.ok).length;
+    $('#status').textContent = `rendered ${res.results.length - fails}/${res.results.length}`;
+  } catch (err) {
+    $('#status').textContent = 'error: ' + err.message;
+  }
+}
+
+async function renderMerge() {
+  const e = effective(state.focus);
+  $('#status').textContent = 'merging…';
+  try {
+    const res = await api('/api/merge', {
+      paths: state.tracks.map((t) => t.path), exclude: [],
+      method: e.method, params: e.params, trim: currentTrim(),
+    });
+    state.mergeResult = res.out_path;
+    $('#status').textContent =
+      `merge: floor ${res.before.noise_floor_dbfs.toFixed(1)} → ${res.after.noise_floor_dbfs.toFixed(1)} dB`;
+    ws.load(audioUrl(res.out_path));
+  } catch (err) {
+    $('#status').textContent = 'error: ' + err.message;
+  }
+}
+
+function setMode(mode) {
+  if (mode === 'merge' && !state.mergeable) return;
+  state.mode = mode;
+  document.querySelectorAll('#mode-toggle button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+document.querySelectorAll('#mode-toggle button').forEach((b) => {
+  b.onclick = () => setMode(b.dataset.mode);
+});
+
+$('#render-all').onclick = renderAll;
+$('#export').onclick = async () => {
+  const src = state.mode === 'merge' ? state.mergeResult : state.cleaned[state.focus];
+  if (!src) { $('#status').textContent = 'nothing rendered to export'; return; }
+  const res = await api('/api/export', { src, dest_dir: `${location.origin ? '' : ''}export` });
+  $('#status').textContent = `exported → ${res.dest}`;
+};
+
+function setTrimEdge(edge) {
+  let r = regions.getRegions()[0];
+  const t = ws.getCurrentTime();
+  if (!r) { regions.addRegion({ start: edge === 'start' ? t : 0,
+                                end: edge === 'end' ? t : ws.getDuration() }); return; }
+  if (edge === 'start') r.setOptions({ start: t });
+  else r.setOptions({ end: t });
+}
+
+const SHORTCUTS = {
+  ' ': () => ws.playPause(),
+  '[': () => ws.zoom(Math.max(0, (ws.options.minPxPerSec || 0) - 20)),
+  ']': () => ws.zoom((ws.options.minPxPerSec || 0) + 20),
+  'ArrowLeft': () => ws.setTime(Math.max(0, ws.getCurrentTime() - 2)),
+  'ArrowRight': () => ws.setTime(ws.getCurrentTime() + 2),
+  'i': () => setTrimEdge('start'),
+  'o': () => setTrimEdge('end'),
+  'r': () => $('#render').onclick(),
+  'R': () => renderAll(),
+  'n': () => focusTrack(Math.min(state.tracks.length - 1, state.focus + 1)),
+  'p': () => focusTrack(Math.max(0, state.focus - 1)),
+  'm': () => setMode(state.mode === 'merge' ? 'normal' : 'merge'),
+  'a': () => toggleAB(!state.showCleaned),
+  'e': () => $('#export').onclick(),
+  '?': () => $('#shortcuts').classList.toggle('hidden'),
+};
+
+window.addEventListener('keydown', (ev) => {
+  if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
+  const key = ev.shiftKey && ev.key === 'R' ? 'R' : ev.key;
+  const fn = SHORTCUTS[key];
+  if (fn) { ev.preventDefault(); fn(); }
+});
+
+$('#shortcuts').innerHTML =
+  '<b>space</b> play · <b>[ ]</b> zoom · <b>← →</b> seek · <b>i o</b> trim in/out · ' +
+  '<b>r</b> render · <b>⇧R</b> all · <b>n p</b> track · <b>m</b> merge · <b>a</b> A/B · ' +
+  '<b>e</b> export · <b>?</b> help';
 
 export { state, ws, focusTrack };  // for later tasks / debugging
