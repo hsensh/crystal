@@ -53,3 +53,39 @@ def scan_session(paths):
         })
     mergeable, reason = is_mergeable(tracks)
     return {"tracks": tracks, "mergeable": mergeable, "reason": reason}
+
+
+def _coherence(a, b):
+    """GCC-PHAT peak magnitude between two mono signals (0..1-ish)."""
+    n = 1 << int(np.ceil(np.log2(len(a) + len(b))))
+    A = np.fft.rfft(a, n)
+    B = np.fft.rfft(b, n)
+    R = A * np.conj(B)
+    R /= (np.abs(R) + 1e-9)
+    cc = np.fft.irfft(R, n)
+    return float(np.max(np.abs(cc)))
+
+
+def detect_derived(audios, thresh=0.6):
+    """Return indices of tracks that look like a mixdown of others.
+
+    A derived mix correlates strongly with at least one other track. We use a
+    mid 5 s window of the mono sum of each track.
+    """
+    mids = []
+    for x in audios:
+        m = x.mean(0)
+        s = len(m) // 2
+        w = m[max(0, s - 120000): s + 120000]  # ~5 s @ 48k
+        mids.append(w)
+    derived = []
+    for i in range(len(mids)):
+        for j in range(len(mids)):
+            if i == j:
+                continue
+            if _coherence(mids[i], mids[j]) >= thresh:
+                # the one with MORE channels (or later index on tie) is the mix
+                if audios[i].shape[0] > audios[j].shape[0]:
+                    derived.append(i)
+                break
+    return sorted(set(derived))
