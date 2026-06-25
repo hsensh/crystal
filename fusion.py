@@ -85,7 +85,7 @@ def detect_derived(audios, thresh=0.6):
                 continue
             if _coherence(mids[i], mids[j]) >= thresh:
                 # the one with MORE channels (or later index on tie) is the mix
-                if audios[i].shape[0] > audios[j].shape[0]:
+                if audios[i].shape[0] >= audios[j].shape[0]:
                     derived.append(i)
                 break
     return sorted(set(derived))
