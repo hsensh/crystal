@@ -1,0 +1,11 @@
+numpy
+scipy
+soundfile
+noisereduce
+torch
+torchaudio
+deepfilternet
+fastapi
+uvicorn
+httpx
+pytest
