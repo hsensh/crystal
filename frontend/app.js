@@ -5,7 +5,10 @@ const state = { tracks: [], focus: 0, mergeable: false, mode: 'normal' };
 const $ = (s) => document.querySelector(s);
 const api = (path, body) =>
   fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body) }).then((r) => r.json());
+                body: JSON.stringify(body) }).then((r) => {
+    if (!r.ok) throw new Error(`API error ${r.status}: ${r.statusText}`);
+    return r.json();
+  });
 
 const ws = WaveSurfer.create({
   container: '#waveform', waveColor: '#3b82f6', progressColor: '#1d4ed8',
@@ -21,7 +24,7 @@ function renderTrackList() {
   ul.innerHTML = '';
   state.tracks.forEach((t, i) => {
     const li = document.createElement('li');
-    li.textContent = `${t.name}  ${t.duration.toFixed(1)}s`;
+    li.textContent = `${t.name}  ${(t.duration ?? 0).toFixed(1)}s`;
     if (i === state.focus) li.classList.add('active');
     li.onclick = () => focusTrack(i);
     ul.appendChild(li);
@@ -36,16 +39,21 @@ function focusTrack(i) {
 
 async function loadSession() {
   const paths = $('#paths').value.split(',').map((s) => s.trim()).filter(Boolean);
-  const res = await api('/api/session', { paths });
-  state.tracks = res.tracks;
-  state.mergeable = res.mergeable;
-  state.focus = 0;
   const notice = $('#merge-notice');
-  $('#merge-btn').disabled = !res.mergeable;
-  if (!res.mergeable) { notice.textContent = res.reason; notice.classList.remove('hidden'); }
-  else notice.classList.add('hidden');
-  renderTrackList();
-  if (state.tracks.length) focusTrack(0);
+  try {
+    const res = await api('/api/session', { paths });
+    state.tracks = res.tracks;
+    state.mergeable = res.mergeable;
+    state.focus = 0;
+    $('#merge-btn').disabled = !res.mergeable;
+    if (!res.mergeable) { notice.textContent = res.reason; notice.classList.remove('hidden'); }
+    else notice.classList.add('hidden');
+    renderTrackList();
+    if (state.tracks.length) focusTrack(0);
+  } catch (err) {
+    notice.textContent = err.message;
+    notice.classList.remove('hidden');
+  }
 }
 
 $('#load-btn').onclick = loadSession;
