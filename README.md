@@ -44,11 +44,6 @@ Outputs → `output/<normal|merge>/<name>.wav` (24-bit / 48 kHz).
 - **rnnoise**: model choice (5 community models in `models/`), `wet/dry mix`
   (lower = more original preserved).
 
-## Output
-Each Render saves `output/<method>/<track>.wav` (24-bit / 48 kHz, streaming-ready).
-Stats shown per render: peak / RMS / noise-floor dBFS (lower noise floor = more
-suppression; watch RMS doesn't drop = dialogue intact).
-
 ## Tuning tips for your case (keep teacup, kill wind/cars)
 - Start `deepfilternet` with attenuation 12–18 dB → natural, transient-safe.
 - For max clean dialogue: `noisereduce__deepfilternet`.

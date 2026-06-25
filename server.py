@@ -123,7 +123,13 @@ def merge(req: MergeReq):
         a, s = P.resample(a, s)
         audios.append(a)
         sr = s
-    fused = fusion.fuse(audios, sr, exclude=req.exclude)
+    if req.exclude:
+        exclude = req.exclude
+    else:
+        auto = fusion.detect_derived(audios)
+        # guard: never exclude all tracks
+        exclude = auto if len(auto) < len(audios) else []
+    fused = fusion.fuse(audios, sr, exclude=exclude)
     fused = P.trim(fused, sr, req.trim[0], req.trim[1])
     before = P.stats(fused)
     out = P.run(req.method, fused, sr, **req.params)
@@ -131,7 +137,8 @@ def merge(req: MergeReq):
     name = "merge.wav"
     out_path = os.path.join(OUT_DIR, "merge", name)
     P.save(out, sr, out_path)
-    return {"name": name, "out_path": out_path, "before": before, "after": after}
+    return {"name": name, "out_path": out_path, "before": before, "after": after,
+            "excluded": exclude}
 
 
 class ExportReq(BaseModel):

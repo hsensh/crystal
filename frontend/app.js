@@ -63,7 +63,8 @@ function renderParams() {
   const dmix = num('DFN mix', 0, 1, 0.05, p.dfn_mix, (v) => setParam('dfn_mix', v));
   const rmodel = sel('rnn model', RNN_MODELS, p.rnn_model, (v) => setParam('rnn_model', v));
   const rmix = num('rnn mix', 0, 1, 0.05, p.rnn_mix, (v) => setParam('rnn_mix', v));
-  [method, prop, atten, dmix, rmodel, rmix].forEach((el) => box.appendChild(el));
+  const stat = chk('stationary', p.stationary, (v) => setParam('stationary', v));
+  [method, prop, atten, dmix, rmodel, rmix, stat].forEach((el) => box.appendChild(el));
 }
 
 function setEff(key, val) {
@@ -89,6 +90,12 @@ function num(label, min, max, step, value, onchange) {
   const i = document.createElement('input');
   i.type = 'range'; i.min = min; i.max = max; i.step = step; i.value = value;
   i.oninput = () => onchange(parseFloat(i.value)); l.appendChild(i); return l;
+}
+function chk(label, value, onchange) {
+  const l = document.createElement('label'); l.textContent = label;
+  const i = document.createElement('input');
+  i.type = 'checkbox'; i.checked = value;
+  i.onchange = () => onchange(i.checked); l.prepend(i); return l;
 }
 
 function currentTrim() {
@@ -204,7 +211,7 @@ $('#render-all').onclick = renderAll;
 $('#export').onclick = async () => {
   const src = state.mode === 'merge' ? state.mergeResult : state.cleaned[state.focus];
   if (!src) { $('#status').textContent = 'nothing rendered to export'; return; }
-  const res = await api('/api/export', { src, dest_dir: `${location.origin ? '' : ''}export` });
+  const res = await api('/api/export', { src, dest_dir: 'output/export' });
   $('#status').textContent = `exported → ${res.dest}`;
 };
 
