@@ -173,3 +173,25 @@ def run(method, audio, sr, **params):
     for fn in METHODS[method]:
         audio = fn(audio, sr, **params)
     return audio
+
+
+# ---------- arbitrary user-ordered chain ----------
+
+CHAIN_FNS = {
+    "noisereduce": m_noisereduce,
+    "deepfilternet": m_deepfilternet,
+    "rnnoise": m_rnnoise,
+}
+
+
+def run_chain(stages, audio, sr):
+    """Run an ordered list of stages on the audio.
+
+    stages: list of {"type": <one of CHAIN_FNS>, "params": {...}}. Each stage's
+    params are passed as kwargs to its backend (extras ignored via **_). Stages
+    apply in list order, so the UI controls order + which methods are present.
+    """
+    for st in stages:
+        fn = CHAIN_FNS[st["type"]]
+        audio = fn(audio, sr, **st.get("params", {}))
+    return audio

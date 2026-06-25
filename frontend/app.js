@@ -1,25 +1,52 @@
 import WaveSurfer from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.esm.js';
 import RegionsPlugin from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/plugins/regions.esm.js';
 
-const METHODS = ['noisereduce', 'deepfilternet', 'rnnoise',
-  'noisereduce__deepfilternet', 'rnnoise__deepfilternet', 'noisereduce__rnnoise'];
 const RNN_MODELS = ['mp.rnnn', 'bd.rnnn', 'sh.rnnn', 'lq.rnnn', 'cb.rnnn'];
+
+// each stage type + its compact controls and default params
+const STAGE_SPECS = {
+  noisereduce: {
+    label: 'noisereduce', defaults: { stationary: true, prop_decrease: 0.8 },
+    controls: [
+      { k: 'stationary', type: 'check', label: 'stationary noise' },
+      { k: 'prop_decrease', type: 'range', label: 'strength', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+  deepfilternet: {
+    label: 'DeepFilterNet', defaults: { atten_lim_db: 15, dfn_mix: 0.8 },
+    controls: [
+      { k: 'atten_lim_db', type: 'range', label: 'max atten (dB)', min: 0, max: 60, step: 1 },
+      { k: 'dfn_mix', type: 'range', label: 'dry/wet mix', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+  rnnoise: {
+    label: 'RNNoise', defaults: { rnn_model: 'mp.rnnn', rnn_mix: 1.0 },
+    controls: [
+      { k: 'rnn_model', type: 'select', label: 'model', opts: RNN_MODELS },
+      { k: 'rnn_mix', type: 'range', label: 'wet/dry mix', min: 0, max: 1, step: 0.05 },
+    ],
+  },
+};
+
+const newStage = (type) => ({ type, params: { ...STAGE_SPECS[type].defaults } });
+const defaultChain = () => [newStage('deepfilternet')];
 
 const state = {
   tracks: [], focus: 0, mergeable: false, mode: 'normal',
   excluded: [], cleaned: {}, mergeResult: null, showCleaned: false,
-  globalDefault: {
-    method: 'deepfilternet',
-    params: { stationary: true, prop_decrease: 0.8, atten_lim_db: 15,
-              dfn_mix: 0.8, rnn_model: 'mp.rnnn', rnn_mix: 1.0 },
-  },
-  overrides: {},
+  chains: {},                 // trackIndex -> stage[]
+  mergeChain: defaultChain(), // merge mode's own chain
 };
 
-function effective(i) {
-  const o = state.overrides[i];
-  return o ? o : { method: state.globalDefault.method,
-                   params: { ...state.globalDefault.params } };
+// the chain currently being edited (per-track in normal, shared in merge)
+function activeChain() {
+  if (state.mode === 'merge') return state.mergeChain;
+  if (!state.chains[state.focus]) state.chains[state.focus] = defaultChain();
+  return state.chains[state.focus];
+}
+function chainFor(i) {
+  if (!state.chains[i]) state.chains[i] = defaultChain();
+  return state.chains[i];
 }
 
 const $ = (s) => document.querySelector(s);
@@ -142,21 +169,52 @@ function focusTrack(i) {
 /* ---------- params panel ---------- */
 
 function renderParams() {
-  const e = effective(state.focus);
-  const p = e.params;
-  const box = $('#params'); box.innerHTML = '';
-  box.append(
-    sel('Method', METHODS, e.method, (v) => { setEff('method', v); renderParams(); }),
-    chk('Stationary noise (noisereduce)', p.stationary, (v) => setParam('stationary', v)),
-    num('noisereduce strength', 0, 1, 0.05, p.prop_decrease, (v) => setParam('prop_decrease', v)),
-    num('DeepFilterNet max atten (dB)', 0, 60, 1, p.atten_lim_db, (v) => setParam('atten_lim_db', v)),
-    num('DeepFilterNet dry/wet mix', 0, 1, 0.05, p.dfn_mix, (v) => setParam('dfn_mix', v)),
-    sel('RNNoise model', RNN_MODELS, p.rnn_model, (v) => setParam('rnn_model', v)),
-    num('RNNoise wet/dry mix', 0, 1, 0.05, p.rnn_mix, (v) => setParam('rnn_mix', v)),
-  );
+  const chain = activeChain();
+  const box = $('#chain'); box.innerHTML = '';
+  if (!chain.length) {
+    const e = document.createElement('div'); e.className = 'chain-empty';
+    e.textContent = 'No stages — audio passes through untouched. Add a stage below.';
+    box.appendChild(e); return;
+  }
+  chain.forEach((st, idx) => box.appendChild(stageCard(st, idx, chain)));
 }
-function setEff(k, v) { const e = effective(state.focus); e[k] = v; state.overrides[state.focus] = e; }
-function setParam(k, v) { const e = effective(state.focus); e.params[k] = v; state.overrides[state.focus] = e; }
+
+function stageCard(st, idx, chain) {
+  const spec = STAGE_SPECS[st.type];
+  const card = document.createElement('div'); card.className = 'stage';
+
+  const head = document.createElement('div'); head.className = 'stage-head';
+  const numEl = document.createElement('span'); numEl.className = 'stage-num'; numEl.textContent = idx + 1;
+  const name = document.createElement('span'); name.className = 'stage-name'; name.textContent = spec.label;
+  const tools = document.createElement('div'); tools.className = 'stage-tools';
+  const up = toolBtn('↑', idx === 0, () => move(chain, idx, -1));
+  const down = toolBtn('↓', idx === chain.length - 1, () => move(chain, idx, +1));
+  const rm = toolBtn('✕', false, () => { chain.splice(idx, 1); renderParams(); });
+  rm.classList.add('rm');
+  tools.append(up, down, rm);
+  head.append(numEl, name, tools);
+
+  const body = document.createElement('div'); body.className = 'stage-body';
+  spec.controls.forEach((c) => {
+    if (c.type === 'check') body.appendChild(chk(c.label, st.params[c.k], (v) => { st.params[c.k] = v; }));
+    else if (c.type === 'select') body.appendChild(sel(c.label, c.opts, st.params[c.k], (v) => { st.params[c.k] = v; }));
+    else body.appendChild(num(c.label, c.min, c.max, c.step, st.params[c.k], (v) => { st.params[c.k] = v; }));
+  });
+
+  card.append(head, body); return card;
+}
+
+function toolBtn(label, disabled, onclick) {
+  const b = document.createElement('button'); b.textContent = label; b.disabled = disabled;
+  b.onclick = onclick; return b;
+}
+function move(chain, idx, dir) {
+  const j = idx + dir;
+  if (j < 0 || j >= chain.length) return;
+  [chain[idx], chain[j]] = [chain[j], chain[idx]];
+  renderParams();
+}
+function addStage(type) { activeChain().push(newStage(type)); renderParams(); }
 
 function sel(label, opts, value, onchange) {
   const l = document.createElement('label'); l.textContent = label;
@@ -200,10 +258,9 @@ function setTrimEdge(edge) {
 
 async function renderFocus() {
   const t = state.tracks[state.focus];
-  const e = effective(state.focus);
   setStatus('rendering…', 'busy');
   try {
-    const res = await apiJSON('/api/render', { path: t.path, method: e.method, params: e.params, trim: currentTrim(), mode: 'normal' });
+    const res = await apiJSON('/api/render', { path: t.path, chain: chainFor(state.focus), trim: currentTrim(), mode: 'normal' });
     state.cleaned[state.focus] = res.out_path;
     showResult(res, `Rendered ${t.name}`);
     renderTrackList();
@@ -214,7 +271,7 @@ async function renderFocus() {
 
 async function renderAll() {
   setStatus('rendering all tracks…', 'busy');
-  const tracks = state.tracks.map((t, i) => { const e = effective(i); return { path: t.path, method: e.method, params: e.params, trim: [0, 0], mode: 'normal' }; });
+  const tracks = state.tracks.map((t, i) => ({ path: t.path, chain: chainFor(i), trim: [0, 0], mode: 'normal' }));
   try {
     const res = await apiJSON('/api/render_all', { tracks });
     res.results.forEach((r, i) => { if (r.ok) state.cleaned[i] = r.out_path; });
@@ -226,10 +283,9 @@ async function renderAll() {
 }
 
 async function renderMerge() {
-  const e = effective(state.focus);
   setStatus('fusing mics + cleaning…', 'busy');
   try {
-    const res = await apiJSON('/api/merge', { paths: state.tracks.map((t) => t.path), exclude: [], method: e.method, params: e.params, trim: currentTrim() });
+    const res = await apiJSON('/api/merge', { paths: state.tracks.map((t) => t.path), exclude: [], chain: state.mergeChain, trim: currentTrim() });
     state.mergeResult = res.out_path;
     state.excluded = res.excluded || [];
     renderTrackList();
@@ -272,9 +328,10 @@ function setMode(mode) {
   if (mode === 'merge' && !state.mergeable) return;
   state.mode = mode;
   document.querySelectorAll('#mode-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-  $('#panel-title').textContent = mode === 'merge' ? 'Fuse mics → one voice' : 'Cleanup';
+  $('#panel-title').textContent = mode === 'merge' ? 'Fuse mics → cleanup chain' : 'Cleanup chain';
   $('#render').innerHTML = (mode === 'merge' ? 'Merge + clean' : 'Render') + ' <kbd>r</kbd>';
   document.querySelectorAll('.hidden-merge').forEach((el) => el.classList.toggle('hidden', mode === 'merge'));
+  renderParams();  // chain differs between per-track and merge
 }
 
 /* ---------- wiring ---------- */
@@ -288,6 +345,7 @@ $('#render-all').onclick = renderAll;
 $('#export').onclick = doExport;
 document.querySelectorAll('#mode-toggle button').forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
 document.querySelectorAll('#ab-toggle button').forEach((b) => { b.onclick = () => setAB(b.dataset.ab); });
+document.querySelectorAll('.add-btn').forEach((b) => { b.onclick = () => addStage(b.dataset.add); });
 
 // dropzone + pickers
 const dz = $('#dropzone');

@@ -70,10 +70,16 @@
 
         <div class="panel">
           <div class="panel-head">
-            <h3 id="panel-title">Cleanup</h3>
+            <h3 id="panel-title">Cleanup chain</h3>
             <span id="status" class="status"></span>
           </div>
-          <div id="params" class="params"></div>
+          <div id="chain" class="chain"></div>
+          <div class="add-stage">
+            <span class="add-label">add stage:</span>
+            <button class="add-btn" data-add="noisereduce">+ noisereduce</button>
+            <button class="add-btn" data-add="deepfilternet">+ DeepFilterNet</button>
+            <button class="add-btn" data-add="rnnoise">+ RNNoise</button>
+          </div>
           <div class="actions">
             <button id="render" class="primary">Render <kbd>r</kbd></button>
             <button id="render-all" class="hidden-merge">Render all tracks <kbd>⇧R</kbd></button>

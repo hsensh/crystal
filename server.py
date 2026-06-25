@@ -97,10 +97,18 @@ OUT_DIR = os.path.join(ROOT, "output")
 
 class RenderReq(BaseModel):
     path: str
-    method: str
+    method: str = ""
     params: dict = {}
+    chain: list[dict] | None = None  # ordered [{type, params}]; overrides method
     trim: list[float] = [0.0, 0.0]
     mode: str = "normal"
+
+
+def _denoise(audio, sr, req):
+    """Run the request's chain if present, else the legacy single method."""
+    if req.chain is not None:
+        return P.run_chain(req.chain, audio, sr)
+    return P.run(req.method, audio, sr, **req.params)
 
 
 def _process_one(req: RenderReq):
@@ -108,7 +116,7 @@ def _process_one(req: RenderReq):
     audio, sr = P.resample(audio, sr)
     audio = P.trim(audio, sr, req.trim[0], req.trim[1])
     before = P.stats(audio)
-    out = P.run(req.method, audio, sr, **req.params)
+    out = _denoise(audio, sr, req)
     after = P.stats(out)
     name = os.path.basename(req.path)
     out_path = os.path.join(OUT_DIR, req.mode, name)
@@ -144,6 +152,7 @@ class MergeReq(BaseModel):
     exclude: list[int] = []
     method: str = "deepfilternet"
     params: dict = {}
+    chain: list[dict] | None = None  # ordered [{type, params}]; overrides method
     trim: list[float] = [0.0, 0.0]
 
 
@@ -164,7 +173,7 @@ def merge(req: MergeReq):
     fused = fusion.fuse(audios, sr, exclude=exclude)
     fused = P.trim(fused, sr, req.trim[0], req.trim[1])
     before = P.stats(fused)
-    out = P.run(req.method, fused, sr, **req.params)
+    out = _denoise(fused, sr, req)
     after = P.stats(out)
     name = "merge.wav"
     out_path = os.path.join(OUT_DIR, "merge", name)
