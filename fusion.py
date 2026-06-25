@@ -89,3 +89,62 @@ def detect_derived(audios, thresh=0.6):
                     derived.append(i)
                 break
     return sorted(set(derived))
+
+
+from scipy.signal import istft, stft  # noqa: E402
+
+_NFFT = 1024
+_HOP = 256
+
+def fuse(audios, sr=48000, exclude=None):
+    """Gain-share auto-mixer. Sample-locked inputs (no realignment).
+
+    Per STFT cell, weight each mic by local SNR, cap clipped mics, normalize,
+    sum complex spectra. Preserves simultaneous speakers (each on its own mic)
+    and fills dropouts (weight flows to whichever mic still has the voice).
+    """
+    exclude = set(exclude or [])
+    mics = [x for i, x in enumerate(audios) if i not in exclude]
+    if not mics:
+        raise ValueError("no mics left after exclude")
+
+    # mono-ize, pad to equal length
+    monos = [x.mean(0).astype("float32") for x in mics]
+    n = max(len(m) for m in monos)
+    monos = [np.pad(m, (0, n - len(m))) for m in monos]
+
+    specs, weights = [], []
+    for m in monos:
+        _, _, Z = stft(m, fs=sr, nperseg=_NFFT, noverlap=_NFFT - _HOP,
+                       boundary=None, padded=True)
+        mag2 = (np.abs(Z) ** 2) + 1e-12               # (F, T)
+        # per-bin noise floor = 10th percentile magnitude² over time
+        floor = np.percentile(mag2, 10, axis=1, keepdims=True) + 1e-12
+        w = mag2 / floor                              # local SNR-ish weight
+        # clipping guard: frames where the mic rails -> down-weight
+        rail = _railed_frame_mask(m, Z.shape[1])      # (T,)
+        w = w * (1.0 - 0.9 * rail)[None, :]
+        specs.append(Z)
+        weights.append(w)
+
+    W = np.stack(weights)                             # (M, F, T)
+    W /= (W.sum(0, keepdims=True) + 1e-12)            # normalize across mics
+    S = np.stack(specs)                               # (M, F, T)
+    fused = (W * S).sum(0)                            # (F, T) complex
+
+    _, y = istft(fused, fs=sr, nperseg=_NFFT, noverlap=_NFFT - _HOP,
+                 boundary=None)
+    y = y[:n].astype("float32")
+    return y[None, :]
+
+def _railed_frame_mask(mono, n_frames):
+    """1.0 for STFT frames containing clipped (|x|>=0.999) samples, else 0."""
+    rail_samp = (np.abs(mono) >= 0.999).astype("float32")
+    # bucket samples into frames
+    idx = np.linspace(0, len(rail_samp), n_frames + 1).astype(int)
+    out = np.zeros(n_frames, dtype="float32")
+    for i in range(n_frames):
+        seg = rail_samp[idx[i]:idx[i + 1]]
+        if seg.size and seg.max() > 0:
+            out[i] = 1.0
+    return out
