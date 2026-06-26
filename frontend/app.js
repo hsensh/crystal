@@ -337,6 +337,8 @@ function setMode(mode) {
 /* ---------- wiring ---------- */
 
 $('#play').onclick = () => ws.playPause();
+ws.on('play', () => { $('#play').textContent = '❚❚'; $('#play').classList.remove('play'); });
+ws.on('pause', () => { $('#play').textContent = '▶'; $('#play').classList.add('play'); });
 $('#zoom-in').onclick = () => ws.zoom((ws.options.minPxPerSec || 0) + 30);
 $('#zoom-out').onclick = () => ws.zoom(Math.max(0, (ws.options.minPxPerSec || 0) - 30));
 $('#clear-trim').onclick = () => regions.clearRegions();

@@ -8,6 +8,22 @@ def _tone(freq, dur, sr=48000, amp=0.3, gap=False):
         x[len(x) // 2:] = 0.0
     return x.astype("float32")[None, :]
 
+def test_fuse_prefers_clean_voice_over_loud_noise():
+    """Quality-aware: a clean quiet voiced mic should beat a LOUD broadband
+    (mic-rubbing/handling) mic, instead of the loud junk winning on energy."""
+    sr = 48000
+    a = _tone(440, 2.0, amp=0.1)                       # clean, quiet, harmonic
+    rng = np.random.default_rng(0)
+    t = np.arange(int(2.0 * sr))
+    b = (0.5 * rng.standard_normal(len(t))).astype("float32")[None, :]  # loud noise
+    out = fusion.fuse([a, b], sr)[0]
+    sp = np.abs(np.fft.rfft(out))
+    fr = np.fft.rfftfreq(len(out), 1 / sr)
+    tone = sp[np.argmin(np.abs(fr - 440))]
+    broad = np.median(sp) + 1e-9
+    assert tone / broad > 2.0  # voiced tone stands clearly above the noise
+
+
 def test_fuse_returns_mono_same_length():
     sr = 48000
     a = _tone(200, 2.0)

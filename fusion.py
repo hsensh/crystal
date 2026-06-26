@@ -97,11 +97,18 @@ _NFFT = 1024
 _HOP = 256
 
 def fuse(audios, sr=48000, exclude=None):
-    """Gain-share auto-mixer. Sample-locked inputs (no realignment).
+    """Quality-aware gain-share auto-mixer. Sample-locked inputs (no realignment).
 
-    Per STFT cell, weight each mic by local SNR, cap clipped mics, normalize,
-    sum complex spectra. Preserves simultaneous speakers (each on its own mic)
-    and fills dropouts (weight flows to whichever mic still has the voice).
+    Per STFT cell, weight each mic by local SNR, then modulate by how
+    speech-like the frame is so loud non-speech (mic rubbing, handling, wind)
+    does NOT win just for being loud:
+      * spectral-flatness penalty — speech is harmonic/peaky (low flatness);
+        rubbing/wind is broadband (high flatness) and gets down-weighted.
+      * transient/handling guard — frames whose energy is an extreme outlier
+        above the mic's own loud baseline (sudden bursts) are scaled down.
+      * digital-clip guard — frames railed at full scale are down-weighted.
+    Normalize across mics, sum complex spectra. Still preserves simultaneous
+    speakers (each on its own mic) and fills dropouts.
     """
     exclude = set(exclude or [])
     mics = [x for i, x in enumerate(audios) if i not in exclude]
@@ -117,13 +124,19 @@ def fuse(audios, sr=48000, exclude=None):
     for m in monos:
         _, _, Z = stft(m, fs=sr, nperseg=_NFFT, noverlap=_NFFT - _HOP,
                        boundary=None, padded=True)
-        mag2 = (np.abs(Z) ** 2) + 1e-12               # (F, T)
+        mag = np.abs(Z)
+        mag2 = (mag ** 2) + 1e-12                      # (F, T)
         # per-bin noise floor = 10th percentile magnitude² over time
         floor = np.percentile(mag2, 10, axis=1, keepdims=True) + 1e-12
         w = mag2 / floor                              # local SNR-ish weight
-        # clipping guard: frames where the mic rails -> down-weight
+
+        # per-frame quality factor (T,) modulates the whole frame
+        q = _frame_quality(mag, mag2)
+        # digital-clip guard: frames railed at full scale
         rail = _railed_frame_mask(m, Z.shape[1])      # (T,)
-        w = w * (1.0 - 0.9 * rail)[None, :]
+        q = q * (1.0 - 0.9 * rail)
+
+        w = w * q[None, :]
         specs.append(Z)
         weights.append(w)
 
@@ -136,6 +149,30 @@ def fuse(audios, sr=48000, exclude=None):
                  boundary=None)
     y = y[:n].astype("float32")
     return y[None, :]
+
+
+def _frame_quality(mag, mag2, flat_floor=0.25, transient_k=4.0):
+    """Per-frame (T,) 0..1 weight: high for speech-like frames, low for
+    broadband or sudden-burst (handling/rubbing) frames.
+
+    flatness = geo-mean / arith-mean of the frame magnitude spectrum
+    (≈0 tonal/voiced, ≈1 broadband noise). speechiness = (1 - flatness),
+    floored so broadband consonants (s/f) aren't gutted.
+    transient: only frames far above the mic's own 90th-pct energy are scaled
+    (so loud-but-steady speech is untouched, brief loud bursts are not).
+    """
+    eps = 1e-12
+    log_gmean = np.exp(np.mean(np.log(mag + eps), axis=0))   # (T,)
+    amean = np.mean(mag, axis=0) + eps                       # (T,)
+    flatness = np.clip(log_gmean / amean, 0.0, 1.0)
+    speechiness = np.maximum(1.0 - flatness, flat_floor)
+
+    e = mag2.sum(axis=0)                                     # frame energy (T,)
+    ref = np.percentile(e, 90) + eps
+    ratio = e / ref
+    transient = np.where(ratio > transient_k, transient_k / ratio, 1.0)
+
+    return (speechiness * transient).astype("float32")
 
 def _railed_frame_mask(mono, n_frames):
     """1.0 for STFT frames containing clipped (|x|>=0.999) samples, else 0."""
