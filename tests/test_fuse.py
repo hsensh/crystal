@@ -24,6 +24,27 @@ def test_fuse_prefers_clean_voice_over_loud_noise():
     assert tone / broad > 2.0  # voiced tone stands clearly above the noise
 
 
+def test_autopick_excludes_rubbing_mic():
+    """Auto-pick must select the clean mic and EXCLUDE (not just attenuate) a mic
+    with a loud broadband rubbing burst — that band should be ~silent in output."""
+    sr = 48000
+    t = np.arange(int(3.0 * sr)) / sr
+    clean = (0.2 * np.sin(2 * np.pi * 300 * t)).astype("float32")[None, :]
+    dirty = (0.2 * np.sin(2 * np.pi * 300 * t)).copy()
+    mid = slice(int(1.0 * sr), int(2.0 * sr))
+    rng = np.random.default_rng(1)
+    dirty[mid] += 0.8 * rng.standard_normal(mid.stop - mid.start)
+    dirty = dirty.astype("float32")[None, :]
+    out = fusion.autopick([clean, dirty], sr)[0]
+
+    def hf_rms(x):
+        sp = np.fft.rfft(x); fr = np.fft.rfftfreq(len(x), 1 / sr)
+        sp[fr < 1000] = 0
+        return np.sqrt(np.mean(np.abs(np.fft.irfft(sp)) ** 2))
+    seg = slice(int(1.3 * sr), int(1.7 * sr))
+    assert hf_rms(out[seg]) < 0.05 * hf_rms(dirty[0][seg])  # rubbing excluded
+
+
 def test_fuse_returns_mono_same_length():
     sr = 48000
     a = _tone(200, 2.0)

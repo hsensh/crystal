@@ -174,6 +174,90 @@ def _frame_quality(mag, mag2, flat_floor=0.25, transient_k=4.0):
 
     return (speechiness * transient).astype("float32")
 
+def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0):
+    """Automatic best-mic mixer: pick the cleanest mic per moment, gate the rest,
+    crossfade switches, level-match. Unlike fuse() this does NOT sum every mic —
+    a mic with rubbing/handling simply isn't selected while it's bad, so the
+    artifact is excluded (not just attenuated). Output stays leveled because mics
+    are RMS-matched and the per-mic gain envelopes sum to 1.
+
+    Per window: score each mic by SNR x speech-likeness x transient/clip guards;
+    softly favor the winner; smooth the choice over time to avoid chattering;
+    upsample to a sample-rate gain envelope and crossfade.
+    """
+    exclude = set(exclude or [])
+    mics = [x for i, x in enumerate(audios) if i not in exclude]
+    if not mics:
+        raise ValueError("no mics left after exclude")
+    monos = [x.mean(0).astype("float32") for x in mics]
+    n = max(len(m) for m in monos)
+    monos = [np.pad(m, (0, n - len(m))) for m in monos]
+
+    # level-match: scale each mic to a common RMS so switching doesn't jump level
+    rmss = [np.sqrt(np.mean(m ** 2)) + 1e-9 for m in monos]
+    target = float(np.median(rmss))
+    monos = [m * (target / r) for m, r in zip(monos, rmss)]
+
+    hop = max(1, int(sr * win_ms / 1000))
+    nfr = n // hop
+    if nfr < 2:
+        return (sum(monos) / len(monos))[None, :n].astype("float32")
+
+    # per-mic per-frame quality score via STFT-derived metric.
+    # score = speech-likeness x "has signal" — loudness is SATURATED so a LOUD
+    # dirty mic (rubbing burst) can't win on energy; clean speech-like wins.
+    scores = []
+    for m in monos:
+        _, _, Z = stft(m, fs=sr, nperseg=_NFFT, noverlap=_NFFT - _HOP,
+                       boundary=None, padded=True)
+        mag = np.abs(Z); mag2 = mag ** 2 + 1e-12
+        floor = np.percentile(mag2, 10, axis=1, keepdims=True) + 1e-12
+        snr = np.mean(mag2 / floor, axis=0)               # (T_stft,)
+        ref = np.median(snr) + 1e-9
+        has_signal = snr / (snr + ref)                    # 0..1, saturates loudness
+        q = _frame_quality(mag, mag2)                     # speechiness x transient guard
+        s = q * has_signal
+        # resample stft-frame score to our window grid
+        xp = np.linspace(0, 1, len(s)); xq = np.linspace(0, 1, nfr)
+        scores.append(np.interp(xq, xp, s))
+    S = np.stack(scores)                                   # (M, nfr)
+
+    # HARD pick the best mic per frame, then apply hysteresis (median filter the
+    # winner sequence) so isolated noisy frames don't flip the choice — only a
+    # sustained better mic switches. Loser -> exactly 0 (no leakage).
+    winner = np.argmax(S, axis=0)                          # (nfr,)
+    k = max(1, int(round(smooth_ms / win_ms)))
+    if k >= 3:
+        winner = _median_filter_int(winner, k if k % 2 else k + 1)
+    W = np.zeros_like(S)
+    W[winner, np.arange(nfr)] = 1.0
+    if k > 1:                                             # moving-average = crossfade
+        ker = np.ones(k) / k
+        W = np.stack([np.convolve(w, ker, mode="same") for w in W])
+        W /= (W.sum(0, keepdims=True) + 1e-9)
+
+    # upsample envelopes to sample rate (linear) and mix
+    t_fr = (np.arange(nfr) + 0.5) * hop
+    t_s = np.arange(n)
+    out = np.zeros(n, dtype="float32")
+    for m, w in zip(monos, W):
+        env = np.interp(t_s, t_fr, w).astype("float32")
+        out += m * env
+
+    peak = np.max(np.abs(out)) + 1e-9
+    if peak > 0.99:
+        out *= 0.99 / peak
+    return out[None, :].astype("float32")
+
+
+def _median_filter_int(seq, k):
+    """Median filter an integer sequence (winner indices) with window k (odd).
+    Smooths out isolated single-frame flips = hysteresis on mic choice."""
+    half = k // 2
+    pad = np.pad(seq, half, mode="edge")
+    return np.array([int(np.median(pad[i:i + k])) for i in range(len(seq))])
+
+
 def _railed_frame_mask(mono, n_frames):
     """1.0 for STFT frames containing clipped (|x|>=0.999) samples, else 0."""
     rail_samp = (np.abs(mono) >= 0.999).astype("float32")

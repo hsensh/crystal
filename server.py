@@ -147,8 +147,13 @@ class MergeReq(BaseModel):
     exclude: list[int] = []
     auto_exclude: bool = True          # auto-drop detected mixdowns when no manual exclude
     preclean: bool = True              # clean each mic BEFORE fusing (per-source)
+    fuse_mode: str = "blend"           # "blend" (sum all) | "autopick" (best mic per moment)
     chain: list[dict] = []             # ordered [{type, params}]; empty = passthrough
     trim: list[float] = [0.0, 0.0]
+
+
+def _combine(audios, sr, mode):
+    return fusion.autopick(audios, sr) if mode == "autopick" else fusion.fuse(audios, sr)
 
 
 @app.post("/api/merge")
@@ -173,19 +178,18 @@ def merge(req: MergeReq):
         raise HTTPException(400, "all mics excluded")
     active = [audios[i] for i in active_idx]
 
-    # reference "before" = raw fusion (so the metric reflects what you'd get
-    # without any cleaning)
-    raw = P.trim(fusion.fuse(active, sr), sr, req.trim[0], req.trim[1])
+    # reference "before" = raw combine (so the metric reflects no cleaning)
+    raw = P.trim(_combine(active, sr, req.fuse_mode), sr, req.trim[0], req.trim[1])
     before = P.stats(raw)
 
     if req.preclean and req.chain:
-        # clean each mic on its own (voice-specific) THEN fuse the clean mics —
-        # removes rubbing/noise per source before it gets summed in
+        # clean each mic on its own (voice-specific) THEN combine the clean mics —
+        # removes rubbing/noise per source before it gets summed/selected
         cleaned = [_denoise(a, sr, req.chain) for a in active]
-        out = fusion.fuse(cleaned, sr)
+        out = _combine(cleaned, sr, req.fuse_mode)
         out = P.trim(out, sr, req.trim[0], req.trim[1])
     else:
-        # fuse raw, then clean the mixture
+        # combine raw, then clean the result
         out = _denoise(raw, sr, req.chain) if req.chain else raw
 
     after = P.stats(out)
@@ -193,7 +197,8 @@ def merge(req: MergeReq):
     out_path = os.path.join(OUT_DIR, "merge", name)
     P.save(out, sr, out_path)
     return {"name": name, "out_path": out_path, "before": before, "after": after,
-            "excluded": exclude, "active": active_idx, "preclean": req.preclean}
+            "excluded": exclude, "active": active_idx, "preclean": req.preclean,
+            "fuse_mode": req.fuse_mode}
 
 
 class ExportReq(BaseModel):

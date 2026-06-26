@@ -37,6 +37,7 @@ const state = {
   chains: {},                 // trackIndex -> stage[]
   mergeChain: defaultChain(), // merge mode's own chain
   micInclude: [],             // bool per track: include in merge
+  fuseMode: 'blend',          // 'blend' | 'autopick'
 };
 
 // the chain currently being edited (per-track in normal, shared in merge)
@@ -317,7 +318,7 @@ async function renderMerge() {
     const res = await apiJSON('/api/merge', {
       paths: state.tracks.map((t) => t.path),
       exclude, auto_exclude: false, preclean: $('#preclean').checked,
-      chain: state.mergeChain, trim: currentTrim(),
+      fuse_mode: state.fuseMode, chain: state.mergeChain, trim: currentTrim(),
     });
     state.mergeResult = res.out_path;
     const usedNames = (res.active || []).map((i) => state.tracks[i]?.name).join(', ');
@@ -382,6 +383,15 @@ $('#export').onclick = doExport;
 document.querySelectorAll('#mode-toggle button').forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
 document.querySelectorAll('#ab-toggle button').forEach((b) => { b.onclick = () => setAB(b.dataset.ab); });
 document.querySelectorAll('.add-btn').forEach((b) => { b.onclick = () => addStage(b.dataset.add); });
+document.querySelectorAll('#fuse-mode button').forEach((b) => {
+  b.onclick = () => {
+    state.fuseMode = b.dataset.fuse;
+    document.querySelectorAll('#fuse-mode button').forEach((x) => x.classList.toggle('active', x === b));
+    $('#fuse-desc').textContent = state.fuseMode === 'autopick'
+      ? 'picks the cleanest mic per moment, crossfades, level-matched — excludes bad parts'
+      : 'sums every mic (weighted)';
+  };
+});
 
 // dropzone + pickers
 const dz = $('#dropzone');

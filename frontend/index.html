@@ -73,6 +73,11 @@
             <h3>Mics to merge</h3>
             <label class="check inline"><input id="preclean" type="checkbox" checked> clean each mic before fusing</label>
           </div>
+          <div class="fuse-mode" id="fuse-mode">
+            <button data-fuse="blend" class="active">Blend all</button>
+            <button data-fuse="autopick">Auto-pick best mic</button>
+            <span class="hint left" id="fuse-desc">sums every mic (weighted)</span>
+          </div>
           <div id="mic-list" class="mic-list"></div>
           <p class="hint left">Rubbing/handling can't be auto-removed — if some mics have it, <b>exclude</b> them or <b>Solo</b> the clean one (trim to the region first).</p>
         </div>
