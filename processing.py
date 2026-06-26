@@ -157,25 +157,7 @@ def m_rnnoise(audio, sr, rnn_model="mp.rnnn", rnn_mix=1.0, **_):
     return (mix * wet + (1 - mix) * dry).astype(np.float32)
 
 
-# ---------- dispatch (singles + stacks) ----------
-
-METHODS = {
-    "noisereduce": [m_noisereduce],
-    "deepfilternet": [m_deepfilternet],
-    "rnnoise": [m_rnnoise],
-    "noisereduce__deepfilternet": [m_noisereduce, m_deepfilternet],
-    "rnnoise__deepfilternet": [m_rnnoise, m_deepfilternet],
-    "noisereduce__rnnoise": [m_noisereduce, m_rnnoise],
-}
-
-
-def run(method, audio, sr, **params):
-    for fn in METHODS[method]:
-        audio = fn(audio, sr, **params)
-    return audio
-
-
-# ---------- arbitrary user-ordered chain ----------
+# ---------- user-ordered chain ----------
 
 CHAIN_FNS = {
     "noisereduce": m_noisereduce,

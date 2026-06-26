@@ -6,8 +6,8 @@ def test_render_noisereduce(write_wav, sine_track):
     a = write_wav("a.wav", sine_track(dur=1.0))
     c = TestClient(server.app)
     r = c.post("/api/render", json={
-        "path": a, "method": "noisereduce",
-        "params": {"stationary": True, "prop_decrease": 0.8},
+        "path": a,
+        "chain": [{"type": "noisereduce", "params": {"stationary": True, "prop_decrease": 0.8}}],
         "trim": [0, 0], "mode": "normal",
     })
     assert r.status_code == 200
@@ -19,11 +19,10 @@ def test_render_noisereduce(write_wav, sine_track):
 def test_render_all_isolates_failure(write_wav, sine_track):
     a = write_wav("a.wav", sine_track(dur=1.0))
     c = TestClient(server.app)
+    nr = [{"type": "noisereduce", "params": {"prop_decrease": 0.5}}]
     r = c.post("/api/render_all", json={"tracks": [
-        {"path": a, "method": "noisereduce", "params": {"prop_decrease": 0.5},
-         "trim": [0, 0], "mode": "normal"},
-        {"path": "/nope/missing.wav", "method": "noisereduce", "params": {},
-         "trim": [0, 0], "mode": "normal"},
+        {"path": a, "chain": nr, "trim": [0, 0], "mode": "normal"},
+        {"path": "/nope/missing.wav", "chain": nr, "trim": [0, 0], "mode": "normal"},
     ]})
     assert r.status_code == 200
     res = r.json()["results"]
@@ -37,8 +36,8 @@ def test_merge_endpoint(write_wav, sine_track):
     b = write_wav("b.wav", sine_track(dur=1.0, freq=600))
     c = TestClient(server.app)
     r = c.post("/api/merge", json={
-        "paths": [a, b], "exclude": [], "method": "noisereduce",
-        "params": {"prop_decrease": 0.5}, "trim": [0, 0],
+        "paths": [a, b], "exclude": [],
+        "chain": [{"type": "noisereduce", "params": {"prop_decrease": 0.5}}], "trim": [0, 0],
     })
     assert r.status_code == 200
     assert r.json()["out_path"].endswith(".wav")
@@ -63,8 +62,8 @@ def test_merge_auto_excludes_derived(write_wav):
     c_mix = write_wav("trlr.wav", mix_stereo)
     client = TestClient(server.app)
     r = client.post("/api/merge", json={
-        "paths": [a, b, c_mix], "exclude": [], "method": "noisereduce",
-        "params": {"prop_decrease": 0.5}, "trim": [0, 0],
+        "paths": [a, b, c_mix], "exclude": [],
+        "chain": [{"type": "noisereduce", "params": {"prop_decrease": 0.5}}], "trim": [0, 0],
     })
     assert r.status_code == 200
     body = r.json()
