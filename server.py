@@ -21,6 +21,16 @@ UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "dialogue-cleaner-uploads")
 app = FastAPI(title="Dialogue Cleaner")
 
 
+@app.middleware("http")
+async def _no_cache(request, call_next):
+    """Never cache the app shell/static — so code changes show on a normal
+    refresh instead of needing a hard-reload."""
+    resp = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static"):
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
+
+
 def _under(rp, root):
     """Check if rp is exactly root or strictly inside it (separator-aware)."""
     root = os.path.realpath(root)
