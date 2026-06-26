@@ -158,13 +158,16 @@ class MergeReq(BaseModel):
     preclean: bool = True              # clean each mic BEFORE fusing (per-source)
     fuse_mode: str = "blend"           # "blend" (sum all) | "autopick" (best mic per moment)
     noise_strength: float = 1.0        # autopick: how hard to avoid noisy mics (0..2)
+    win_ms: float = 46.0               # autopick: decision window (how fast it can switch)
+    smooth_ms: float = 120.0           # autopick: hysteresis + crossfade length
     chain: list[dict] = []             # ordered [{type, params}]; empty = passthrough
     trim: list[float] = [0.0, 0.0]
 
 
-def _combine(audios, sr, mode, noise_strength=1.0):
-    if mode == "autopick":
-        return fusion.autopick(audios, sr, noise_strength=noise_strength)
+def _combine(audios, sr, req):
+    if req.fuse_mode == "autopick":
+        return fusion.autopick(audios, sr, noise_strength=req.noise_strength,
+                               win_ms=req.win_ms, smooth_ms=req.smooth_ms)
     return fusion.fuse(audios, sr)
 
 
@@ -191,15 +194,14 @@ def merge(req: MergeReq):
     active = [audios[i] for i in active_idx]
 
     # reference "before" = raw combine (so the metric reflects no cleaning)
-    raw = P.trim(_combine(active, sr, req.fuse_mode, req.noise_strength),
-                 sr, req.trim[0], req.trim[1])
+    raw = P.trim(_combine(active, sr, req), sr, req.trim[0], req.trim[1])
     before = P.stats(raw)
 
     if req.preclean and req.chain:
         # clean each mic on its own (voice-specific) THEN combine the clean mics —
         # removes noise per source before it gets summed/selected
         cleaned = [_denoise(a, sr, req.chain) for a in active]
-        out = _combine(cleaned, sr, req.fuse_mode, req.noise_strength)
+        out = _combine(cleaned, sr, req)
         out = P.trim(out, sr, req.trim[0], req.trim[1])
     else:
         # combine raw, then clean the result

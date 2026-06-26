@@ -39,6 +39,8 @@ const state = {
   micInclude: [],             // bool per track: include in merge
   fuseMode: 'blend',          // 'blend' | 'autopick'
   noiseStrength: 1.0,
+  winMs: 46,
+  smoothMs: 120,
   showNoise: false,
 };
 const noiseIds = new Set();   // wavesurfer region ids that are noise highlights
@@ -348,6 +350,7 @@ async function renderMerge() {
       exclude, auto_exclude: exclude.length ? false : $('#auto-exclude').checked,
       preclean: $('#preclean').checked,
       fuse_mode: state.fuseMode, noise_strength: state.noiseStrength,
+      win_ms: state.winMs, smooth_ms: state.smoothMs,
       chain: state.mergeChain, trim: currentTrim(),
     });
     state.mergeResult = res.out_path;
@@ -420,12 +423,20 @@ document.querySelectorAll('#fuse-mode button').forEach((b) => {
     $('#fuse-desc').textContent = state.fuseMode === 'autopick'
       ? 'picks the cleanest mic per moment, crossfades, level-matched — excludes bad parts'
       : 'sums every mic (weighted)';
-    $('#noise-row').classList.toggle('hidden', state.fuseMode !== 'autopick');
+    $('#autopick-adv').classList.toggle('hidden', state.fuseMode !== 'autopick');
   };
 });
 $('#noise-strength').oninput = (e) => {
   state.noiseStrength = parseFloat(e.target.value);
   $('#noise-val').textContent = state.noiseStrength.toFixed(2);
+};
+$('#win-ms').oninput = (e) => {
+  state.winMs = parseFloat(e.target.value);
+  $('#win-val').textContent = String(state.winMs);
+};
+$('#smooth-ms').oninput = (e) => {
+  state.smoothMs = parseFloat(e.target.value);
+  $('#smooth-val').textContent = String(state.smoothMs);
 };
 $('#noise-btn').onclick = () => {
   state.showNoise = !state.showNoise;

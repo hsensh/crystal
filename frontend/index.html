@@ -83,10 +83,20 @@
             <button data-fuse="autopick">Auto-pick best mic</button>
             <span class="hint left" id="fuse-desc">sums every mic (weighted)</span>
           </div>
-          <label id="noise-row" class="rub-row hidden">
-            <span class="row"><span>avoid noisy mic (sensitivity)</span><span class="val" id="noise-val">1.00</span></span>
-            <input id="noise-strength" type="range" min="0" max="2" step="0.1" value="1">
-          </label>
+          <div id="autopick-adv" class="autopick-adv hidden">
+            <label class="rub-row">
+              <span class="row"><span>avoid noisy mic (sensitivity)</span><span class="val" id="noise-val">1.00</span></span>
+              <input id="noise-strength" type="range" min="0" max="2" step="0.1" value="1">
+            </label>
+            <label class="rub-row">
+              <span class="row"><span>switch window (ms) — how fast it can change mic</span><span class="val" id="win-val">46</span></span>
+              <input id="win-ms" type="range" min="10" max="200" step="1" value="46">
+            </label>
+            <label class="rub-row">
+              <span class="row"><span>smoothing (ms) — hysteresis + crossfade</span><span class="val" id="smooth-val">120</span></span>
+              <input id="smooth-ms" type="range" min="0" max="500" step="10" value="120">
+            </label>
+          </div>
           <div id="mic-list" class="mic-list"></div>
           <p class="hint left">Noise like handling or wind can't be fully auto-removed — if some mics have it, <b>exclude</b> them or <b>Solo</b> the clean one (trim to the region first). <b>Auto-pick</b> tries this for you.</p>
         </div>
