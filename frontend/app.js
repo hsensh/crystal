@@ -33,7 +33,7 @@ const defaultChain = () => [newStage('deepfilternet')];
 
 const state = {
   tracks: [], focus: 0, mergeable: false, mode: 'normal',
-  excluded: [], cleaned: {}, mergeResult: null, showCleaned: false,
+  excluded: [], cleaned: {}, mergeResult: null, mergeRaw: null, showCleaned: false,
   chains: {},                 // trackIndex -> stage[]
   mergeChain: defaultChain(), // merge mode's own chain
   micInclude: [],             // bool per track: include in merge
@@ -103,6 +103,7 @@ function applySession(res) {
   state.cleaned = {};
   state.overrides = {};
   state.mergeResult = null;
+  state.mergeRaw = null;
   state.focus = 0;
   state.micInclude = state.tracks.map(() => true);  // all mics in by default
 
@@ -354,10 +355,12 @@ async function renderMerge() {
       chain: state.mergeChain, trim: currentTrim(),
     });
     state.mergeResult = res.out_path;
+    state.mergeRaw = res.raw_path;
     const usedNames = (res.active || []).map((i) => state.tracks[i]?.name).join(', ');
     $('#now-track').textContent = 'Merged master';
     showResult(res, `Merged from: ${usedNames}`);
-    loadWave(audioUrl(res.out_path));
+    $('#ab-clean').disabled = false;     // enable A/B for the merge result
+    setAB('clean');                       // jump to the cleaned preview
   } catch (err) { setStatus('error: ' + err.message, 'err'); }
 }
 
@@ -382,6 +385,16 @@ async function doExport() {
 /* ---------- A/B + mode ---------- */
 
 function setAB(which) {
+  // merge mode: Original = raw combined, Cleaned = cleaned merged master
+  if (state.mode === 'merge') {
+    if (which === 'clean' && !state.mergeResult) return;
+    if (which === 'orig' && !state.mergeRaw) return;
+    state.showCleaned = which === 'clean';
+    document.querySelectorAll('#ab-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.ab === which));
+    loadWave(audioUrl(state.showCleaned ? state.mergeResult : state.mergeRaw));
+    return;
+  }
+  // normal mode: per-track original vs cleaned
   const cleaned = state.cleaned[state.focus];
   if (which === 'clean' && !cleaned) return;
   state.showCleaned = which === 'clean';
@@ -398,7 +411,10 @@ function setMode(mode) {
   $('#render').innerHTML = (mode === 'merge' ? 'Merge + clean' : 'Render') + ' <kbd>r</kbd>';
   document.querySelectorAll('.hidden-merge').forEach((el) => el.classList.toggle('hidden', mode === 'merge'));
   $('#merge-panel').classList.toggle('hidden', mode !== 'merge');
-  if (mode === 'merge') renderMicPanel();
+  if (mode === 'merge') {
+    renderMicPanel();
+    $('#ab-clean').disabled = !state.mergeResult;  // enabled once a merge is rendered
+  }
   renderParams();  // chain differs between per-track and merge
 }
 

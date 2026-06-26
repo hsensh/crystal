@@ -211,7 +211,11 @@ def merge(req: MergeReq):
     name = "merge.wav"
     out_path = os.path.join(OUT_DIR, "merge", name)
     P.save(out, sr, out_path)
-    return {"name": name, "out_path": out_path, "before": before, "after": after,
+    # also save the raw (uncleaned) combine so the UI can A/B it
+    raw_path = os.path.join(OUT_DIR, "merge", "merge_raw.wav")
+    P.save(raw, sr, raw_path)
+    return {"name": name, "out_path": out_path, "raw_path": raw_path,
+            "before": before, "after": after,
             "excluded": exclude, "active": active_idx, "preclean": req.preclean,
             "fuse_mode": req.fuse_mode}
 
