@@ -5,6 +5,13 @@ const RNN_MODELS = ['mp.rnnn', 'bd.rnnn', 'sh.rnnn', 'lq.rnnn', 'cb.rnnn'];
 
 // each stage type + its compact controls and default params
 const STAGE_SPECS = {
+  leveler: {
+    label: 'Leveler', defaults: { lvl_max_gain_db: 12, lvl_smooth_ms: 400 },
+    controls: [
+      { k: 'lvl_max_gain_db', type: 'range', label: 'max boost (dB)', min: 0, max: 30, step: 1 },
+      { k: 'lvl_smooth_ms', type: 'range', label: 'smoothing (ms)', min: 50, max: 2000, step: 50 },
+    ],
+  },
   noisereduce: {
     label: 'noisereduce', defaults: { stationary: true, prop_decrease: 0.8 },
     controls: [

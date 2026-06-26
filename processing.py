@@ -137,6 +137,33 @@ def m_deepfilternet(audio, sr, atten_lim_db=0.0, dfn_mix=1.0, **_):
     return (mix * out[:, :n] + (1 - mix) * audio[:, :n]).astype(np.float32)
 
 
+def m_leveler(audio, sr, lvl_max_gain_db=12.0, lvl_smooth_ms=400.0, **_):
+    """Dialogue leveler / AGC via ffmpeg dynaudnorm: follow the speech envelope
+    and raise quiet passages toward a consistent loudness (and tame loud ones).
+    Evens out a near speaker vs a quiet/muffled one on the same mic.
+
+    lvl_max_gain_db: cap on how much a quiet passage can be boosted (keeps it
+      from blowing up silence/noise). lvl_smooth_ms: gain-follow window — larger
+      = smoother/slower (less pumping), smaller = more aggressive leveling.
+    """
+    m = 10 ** (float(lvl_max_gain_db) / 20.0)          # dB -> linear gain cap
+    m = min(max(m, 1.0), 100.0)                        # dynaudnorm m range
+    # gain-follow window ~= g * frame; small g + short frame => local leveling
+    # (large g washes out into one global gain). Window = lvl_smooth_ms.
+    f = int(min(max(float(lvl_smooth_ms) / 3.0, 10.0), 8000.0))
+    with tempfile.TemporaryDirectory() as d:
+        ip = os.path.join(d, "in.wav")
+        op = os.path.join(d, "out.wav")
+        sf.write(ip, audio.T, sr, subtype="FLOAT")
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", ip,
+             "-af", f"dynaudnorm=f={f}:g=3:p=0.95:m={m:.2f}", op],
+            check=True,
+        )
+        out, _ = sf.read(op, dtype="float32", always_2d=True)
+    return out.T.astype(np.float32)
+
+
 def m_rnnoise(audio, sr, rnn_model="mp.rnnn", rnn_mix=1.0, **_):
     model_path = os.path.join(MODELS_DIR, rnn_model)
     with tempfile.TemporaryDirectory() as d:
@@ -160,6 +187,7 @@ def m_rnnoise(audio, sr, rnn_model="mp.rnnn", rnn_mix=1.0, **_):
 # ---------- user-ordered chain ----------
 
 CHAIN_FNS = {
+    "leveler": m_leveler,
     "noisereduce": m_noisereduce,
     "deepfilternet": m_deepfilternet,
     "rnnoise": m_rnnoise,
