@@ -63,6 +63,7 @@
               <button id="zoom-out" title="Zoom out ([)">−</button>
               <button id="zoom-in" title="Zoom in (])">+</button>
             </div>
+            <button id="rub-btn" class="ghost sm" title="Highlight detected rubbing/handling regions">⚠ highlight rubbing</button>
             <span class="hint">drag on waveform to select a region · <b>i</b>/<b>o</b> set in/out</span>
             <button id="clear-trim" class="ghost sm">clear trim</button>
           </div>
@@ -78,6 +79,10 @@
             <button data-fuse="autopick">Auto-pick best mic</button>
             <span class="hint left" id="fuse-desc">sums every mic (weighted)</span>
           </div>
+          <label id="rub-row" class="rub-row hidden">
+            <span class="row"><span>avoid rubbing (sensitivity)</span><span class="val" id="rub-val">1.00</span></span>
+            <input id="rub-strength" type="range" min="0" max="2" step="0.1" value="1">
+          </label>
           <div id="mic-list" class="mic-list"></div>
           <p class="hint left">Rubbing/handling can't be auto-removed — if some mics have it, <b>exclude</b> them or <b>Solo</b> the clean one (trim to the region first).</p>
         </div>

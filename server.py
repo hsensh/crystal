@@ -80,6 +80,15 @@ def audio(path: str = Query(...)):
     return FileResponse(_safe(path), media_type="audio/wav")
 
 
+@app.get("/api/rubbing")
+def rubbing(path: str = Query(...), thresh: float = 0.45):
+    """Detected cloth/handling-rubbing regions for a track, for waveform overlay."""
+    a, s = P.load(_safe(path))
+    a, s = P.resample(a, s)
+    segs = fusion.rubbing_segments(a.mean(0), s, thresh=thresh)
+    return {"segments": segs}
+
+
 @app.get("/")
 def index():
     index_path = os.path.join(FRONTEND, "index.html")
@@ -148,12 +157,15 @@ class MergeReq(BaseModel):
     auto_exclude: bool = True          # auto-drop detected mixdowns when no manual exclude
     preclean: bool = True              # clean each mic BEFORE fusing (per-source)
     fuse_mode: str = "blend"           # "blend" (sum all) | "autopick" (best mic per moment)
+    rub_strength: float = 1.0          # autopick: how hard to avoid rubbing mics (0..2)
     chain: list[dict] = []             # ordered [{type, params}]; empty = passthrough
     trim: list[float] = [0.0, 0.0]
 
 
-def _combine(audios, sr, mode):
-    return fusion.autopick(audios, sr) if mode == "autopick" else fusion.fuse(audios, sr)
+def _combine(audios, sr, mode, rub_strength=1.0):
+    if mode == "autopick":
+        return fusion.autopick(audios, sr, rub_strength=rub_strength)
+    return fusion.fuse(audios, sr)
 
 
 @app.post("/api/merge")
@@ -179,14 +191,15 @@ def merge(req: MergeReq):
     active = [audios[i] for i in active_idx]
 
     # reference "before" = raw combine (so the metric reflects no cleaning)
-    raw = P.trim(_combine(active, sr, req.fuse_mode), sr, req.trim[0], req.trim[1])
+    raw = P.trim(_combine(active, sr, req.fuse_mode, req.rub_strength),
+                 sr, req.trim[0], req.trim[1])
     before = P.stats(raw)
 
     if req.preclean and req.chain:
         # clean each mic on its own (voice-specific) THEN combine the clean mics —
         # removes rubbing/noise per source before it gets summed/selected
         cleaned = [_denoise(a, sr, req.chain) for a in active]
-        out = _combine(cleaned, sr, req.fuse_mode)
+        out = _combine(cleaned, sr, req.fuse_mode, req.rub_strength)
         out = P.trim(out, sr, req.trim[0], req.trim[1])
     else:
         # combine raw, then clean the result

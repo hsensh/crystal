@@ -174,7 +174,58 @@ def _frame_quality(mag, mag2, flat_floor=0.25, transient_k=4.0):
 
     return (speechiness * transient).astype("float32")
 
-def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0):
+def rubbing_score(mono, sr=48000):
+    """Per-STFT-frame 0..1 likelihood that a frame is cloth/handling rubbing
+    rather than voice. Signature: energy piles up BELOW the voice band (<200 Hz)
+    while the speech band is broadband/non-harmonic (unvoiced).
+
+    Returns (score (T,), frame_times (T,)) so callers can map to seconds.
+    """
+    eps = 1e-12
+    _, _, Z = stft(mono.astype("float32"), fs=sr, nperseg=_NFFT,
+                   noverlap=_NFFT - _HOP, boundary=None, padded=True)
+    mag = np.abs(Z); mag2 = mag ** 2 + eps
+    freqs = np.linspace(0, sr / 2, mag.shape[0])
+    low = freqs < 200
+    speech = (freqs >= 300) & (freqs <= 3400)
+
+    e_low = mag2[low].sum(0)
+    e_sp = mag2[speech].sum(0) + eps
+    lf_ratio = e_low / e_sp                       # >>1 when low-end dominates
+    lf_n = lf_ratio / (lf_ratio + 1.0)            # 0..1 saturating
+
+    sb = mag[speech]
+    gm = np.exp(np.mean(np.log(sb + eps), axis=0))
+    am = np.mean(sb, axis=0) + eps
+    voiced = 1.0 - np.clip(gm / am, 0.0, 1.0)     # high = harmonic/voiced
+
+    score = (lf_n * (1.0 - voiced)).astype("float32")
+    times = (np.arange(mag.shape[1])) * _HOP / sr
+    return score, times
+
+
+def rubbing_segments(mono, sr=48000, thresh=0.45, min_dur=0.05):
+    """List of [start_s, end_s] where rubbing_score exceeds thresh (contiguous
+    runs shorter than min_dur dropped). For highlighting on the waveform."""
+    score, times = rubbing_score(mono, sr)
+    hot = score > thresh
+    segs, i, n = [], 0, len(hot)
+    while i < n:
+        if hot[i]:
+            j = i
+            while j < n and hot[j]:
+                j += 1
+            a, b = times[i], times[min(j, n - 1)]
+            if b - a >= min_dur:
+                segs.append([round(float(a), 3), round(float(b), 3)])
+            i = j
+        else:
+            i += 1
+    return segs
+
+
+def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0,
+             rub_strength=1.0):
     """Automatic best-mic mixer: pick the cleanest mic per moment, gate the rest,
     crossfade switches, level-match. Unlike fuse() this does NOT sum every mic —
     a mic with rubbing/handling simply isn't selected while it's bad, so the
@@ -216,7 +267,9 @@ def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0):
         ref = np.median(snr) + 1e-9
         has_signal = snr / (snr + ref)                    # 0..1, saturates loudness
         q = _frame_quality(mag, mag2)                     # speechiness x transient guard
-        s = q * has_signal
+        rub, _ = rubbing_score(m, sr)                     # dedicated rubbing detector
+        rub_pen = np.clip(1.0 - rub_strength * rub, 0.0, 1.0)
+        s = q * has_signal * rub_pen                      # rubbing mic loses here
         # resample stft-frame score to our window grid
         xp = np.linspace(0, 1, len(s)); xq = np.linspace(0, 1, nfr)
         scores.append(np.interp(xq, xp, s))
