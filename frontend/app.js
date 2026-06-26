@@ -36,6 +36,7 @@ const state = {
   excluded: [], cleaned: {}, mergeResult: null, showCleaned: false,
   chains: {},                 // trackIndex -> stage[]
   mergeChain: defaultChain(), // merge mode's own chain
+  micInclude: [],             // bool per track: include in merge
 };
 
 // the chain currently being edited (per-track in normal, shared in merge)
@@ -90,6 +91,7 @@ function applySession(res) {
   state.overrides = {};
   state.mergeResult = null;
   state.focus = 0;
+  state.micInclude = state.tracks.map(() => true);  // all mics in by default
 
   const badge = $('#session-badge');
   if (!state.tracks.length) {
@@ -216,6 +218,30 @@ function move(chain, idx, dir) {
 }
 function addStage(type) { activeChain().push(newStage(type)); renderParams(); }
 
+/* ---------- merge mic panel ---------- */
+
+function renderMicPanel() {
+  const box = $('#mic-list'); box.innerHTML = '';
+  const soloed = state.micInclude.filter(Boolean).length === 1;
+  state.tracks.forEach((t, i) => {
+    const row = document.createElement('div'); row.className = 'mic-row' + (state.micInclude[i] ? '' : ' off');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.micInclude[i];
+    cb.onchange = () => { state.micInclude[i] = cb.checked; renderMicPanel(); };
+    const name = document.createElement('span'); name.className = 'm-name'; name.textContent = t.name;
+    const meta = document.createElement('span'); meta.className = 'm-meta'; meta.textContent = `${(t.duration ?? 0).toFixed(1)}s · ${t.channels}ch`;
+    const spacer = document.createElement('span'); spacer.className = 'spacer';
+    const solo = document.createElement('button');
+    solo.className = 'solo' + (soloed && state.micInclude[i] ? ' active' : '');
+    solo.textContent = 'Solo';
+    solo.onclick = () => { state.micInclude = state.tracks.map((_, j) => j === i); renderMicPanel(); };
+    row.append(cb, name, meta, spacer, solo);
+    box.appendChild(row);
+  });
+}
+function mergeExclude() {
+  return state.tracks.map((_, i) => i).filter((i) => !state.micInclude[i]);
+}
+
 function sel(label, opts, value, onchange) {
   const l = document.createElement('label'); l.textContent = label;
   const s = document.createElement('select');
@@ -283,14 +309,20 @@ async function renderAll() {
 }
 
 async function renderMerge() {
-  setStatus('fusing mics + cleaning…', 'busy');
+  const exclude = mergeExclude();
+  const active = state.tracks.length - exclude.length;
+  if (!active) { setStatus('all mics excluded — include at least one', 'err'); return; }
+  setStatus(`fusing ${active} mic(s)${$('#preclean').checked ? ' (cleaning each first)' : ''}…`, 'busy');
   try {
-    const res = await apiJSON('/api/merge', { paths: state.tracks.map((t) => t.path), exclude: [], chain: state.mergeChain, trim: currentTrim() });
+    const res = await apiJSON('/api/merge', {
+      paths: state.tracks.map((t) => t.path),
+      exclude, auto_exclude: false, preclean: $('#preclean').checked,
+      chain: state.mergeChain, trim: currentTrim(),
+    });
     state.mergeResult = res.out_path;
-    state.excluded = res.excluded || [];
-    renderTrackList();
+    const usedNames = (res.active || []).map((i) => state.tracks[i]?.name).join(', ');
     $('#now-track').textContent = 'Merged master';
-    showResult(res, 'Merged master' + (state.excluded.length ? ` (excluded ${state.excluded.map((i) => state.tracks[i]?.name).join(', ')})` : ''));
+    showResult(res, `Merged from: ${usedNames}`);
     ws.load(audioUrl(res.out_path));
   } catch (err) { setStatus('error: ' + err.message, 'err'); }
 }
@@ -331,6 +363,8 @@ function setMode(mode) {
   $('#panel-title').textContent = mode === 'merge' ? 'Fuse mics → cleanup chain' : 'Cleanup chain';
   $('#render').innerHTML = (mode === 'merge' ? 'Merge + clean' : 'Render') + ' <kbd>r</kbd>';
   document.querySelectorAll('.hidden-merge').forEach((el) => el.classList.toggle('hidden', mode === 'merge'));
+  $('#merge-panel').classList.toggle('hidden', mode !== 'merge');
+  if (mode === 'merge') renderMicPanel();
   renderParams();  // chain differs between per-track and merge
 }
 

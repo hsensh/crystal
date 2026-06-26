@@ -150,9 +150,11 @@ def render_all(req: RenderAllReq):
 class MergeReq(BaseModel):
     paths: list[str]
     exclude: list[int] = []
+    auto_exclude: bool = True          # auto-drop detected mixdowns when no manual exclude
+    preclean: bool = True              # clean each mic BEFORE fusing (per-source)
     method: str = "deepfilternet"
     params: dict = {}
-    chain: list[dict] | None = None  # ordered [{type, params}]; overrides method
+    chain: list[dict] | None = None    # ordered [{type, params}]; overrides method
     trim: list[float] = [0.0, 0.0]
 
 
@@ -164,22 +166,42 @@ def merge(req: MergeReq):
         a, s = P.resample(a, s)
         audios.append(a)
         sr = s
+
+    # which mics are excluded: explicit user list wins; else auto-detected mixdowns
     if req.exclude:
-        exclude = req.exclude
-    else:
+        exclude = list(req.exclude)
+    elif req.auto_exclude:
         auto = fusion.detect_derived(audios)
-        # guard: never exclude all tracks
         exclude = auto if len(auto) < len(audios) else []
-    fused = fusion.fuse(audios, sr, exclude=exclude)
-    fused = P.trim(fused, sr, req.trim[0], req.trim[1])
-    before = P.stats(fused)
-    out = _denoise(fused, sr, req)
+    else:
+        exclude = []
+    active_idx = [i for i in range(len(audios)) if i not in exclude]
+    if not active_idx:
+        raise HTTPException(400, "all mics excluded")
+    active = [audios[i] for i in active_idx]
+
+    # reference "before" = raw fusion (so the metric reflects what you'd get
+    # without any cleaning)
+    raw = P.trim(fusion.fuse(active, sr), sr, req.trim[0], req.trim[1])
+    before = P.stats(raw)
+
+    has_chain = req.chain is not None or bool(req.method)
+    if req.preclean and has_chain:
+        # clean each mic on its own (voice-specific) THEN fuse the clean mics —
+        # removes rubbing/noise per source before it gets summed in
+        cleaned = [_denoise(a, sr, req) for a in active]
+        out = fusion.fuse(cleaned, sr)
+        out = P.trim(out, sr, req.trim[0], req.trim[1])
+    else:
+        # fuse raw, then clean the mixture
+        out = _denoise(raw, sr, req) if has_chain else raw
+
     after = P.stats(out)
     name = "merge.wav"
     out_path = os.path.join(OUT_DIR, "merge", name)
     P.save(out, sr, out_path)
     return {"name": name, "out_path": out_path, "before": before, "after": after,
-            "excluded": exclude}
+            "excluded": exclude, "active": active_idx, "preclean": req.preclean}
 
 
 class ExportReq(BaseModel):

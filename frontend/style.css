@@ -140,6 +140,19 @@ main { display: flex; height: calc(100vh - 71px); }
 .stage-body .val { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
 .stage-body .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
 
+/* ---- merge mic panel ---- */
+.mic-list { display: flex; flex-direction: column; gap: 8px; }
+.mic-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+           background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+.mic-row.off { opacity: .5; }
+.mic-row .m-name { font-weight: 600; }
+.mic-row .m-meta { font-size: 11.5px; color: var(--muted); }
+.mic-row .spacer { margin-left: auto; }
+.mic-row .solo { padding: 4px 12px; font-size: 12px; }
+.mic-row .solo.active { background: var(--warn); border-color: var(--warn); color: #1a1205; }
+.check.inline { flex-direction: row; align-items: center; gap: 7px; color: var(--text); font-size: 12.5px; }
+.hint.left { margin-left: 0; text-align: left; margin-top: 12px; }
+
 .add-stage { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .add-label { color: var(--muted); font-size: 12.5px; }
 .add-btn { padding: 6px 12px; font-size: 12.5px; }
