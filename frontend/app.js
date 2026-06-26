@@ -86,6 +86,12 @@ regions.on('region-created', (r) => {
 
 const audioUrl = (path) => `/api/audio?path=${encodeURIComponent(path)}`;
 
+// loading a new clip while one is still loading makes WaveSurfer abort the old
+// fetch (AbortError) — that's expected, swallow it so it isn't an unhandled reject
+function loadWave(url) {
+  ws.load(url).catch((e) => { if (e && e.name !== 'AbortError') console.error(e); });
+}
+
 /* ---------- loading sessions ---------- */
 
 function applySession(res) {
@@ -164,7 +170,7 @@ function focusTrack(i) {
   $('#now-track').textContent = state.tracks[i].name;
   $('#ab-clean').disabled = !state.cleaned[i];
   setAB('orig');
-  ws.load(audioUrl(state.tracks[i].path));
+  loadWave(audioUrl(state.tracks[i].path));
   noiseIds.clear();  // regions cleared on load; drop stale ids
   ws.once('ready', () => { if (state.showNoise) refreshNoise(); });
   renderParams();
@@ -348,7 +354,7 @@ async function renderMerge() {
     const usedNames = (res.active || []).map((i) => state.tracks[i]?.name).join(', ');
     $('#now-track').textContent = 'Merged master';
     showResult(res, `Merged from: ${usedNames}`);
-    ws.load(audioUrl(res.out_path));
+    loadWave(audioUrl(res.out_path));
   } catch (err) { setStatus('error: ' + err.message, 'err'); }
 }
 
@@ -378,7 +384,7 @@ function setAB(which) {
   state.showCleaned = which === 'clean';
   document.querySelectorAll('#ab-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.ab === which));
   const t = state.tracks[state.focus];
-  ws.load(audioUrl(state.showCleaned ? cleaned : t.path));
+  loadWave(audioUrl(state.showCleaned ? cleaned : t.path));
 }
 
 function setMode(mode) {
