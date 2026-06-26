@@ -100,7 +100,7 @@ def fuse(audios, sr=48000, exclude=None):
     """Quality-aware gain-share auto-mixer. Sample-locked inputs (no realignment).
 
     Per STFT cell, weight each mic by local SNR, then modulate by how
-    speech-like the frame is so loud non-speech (mic rubbing, handling, wind)
+    speech-like the frame is so loud non-speech (handling, wind, thumps)
     does NOT win just for being loud:
       * spectral-flatness penalty — speech is harmonic/peaky (low flatness);
         rubbing/wind is broadband (high flatness) and gets down-weighted.
@@ -174,10 +174,11 @@ def _frame_quality(mag, mag2, flat_floor=0.25, transient_k=4.0):
 
     return (speechiness * transient).astype("float32")
 
-def rubbing_score(mono, sr=48000):
-    """Per-STFT-frame 0..1 likelihood that a frame is cloth/handling rubbing
-    rather than voice. Signature: energy piles up BELOW the voice band (<200 Hz)
-    while the speech band is broadband/non-harmonic (unvoiced).
+def noise_score(mono, sr=48000):
+    """Per-STFT-frame 0..1 likelihood that a frame is non-speech low-frequency
+    noise (mic handling, cloth, wind rumble, thumps/pops) rather than voice.
+    Signature: energy piles up BELOW the voice band (<200 Hz) while the speech
+    band is broadband/non-harmonic (unvoiced).
 
     Returns (score (T,), frame_times (T,)) so callers can map to seconds.
     """
@@ -204,10 +205,10 @@ def rubbing_score(mono, sr=48000):
     return score, times
 
 
-def rubbing_segments(mono, sr=48000, thresh=0.45, min_dur=0.05):
-    """List of [start_s, end_s] where rubbing_score exceeds thresh (contiguous
+def noise_segments(mono, sr=48000, thresh=0.45, min_dur=0.05):
+    """List of [start_s, end_s] where noise_score exceeds thresh (contiguous
     runs shorter than min_dur dropped). For highlighting on the waveform."""
-    score, times = rubbing_score(mono, sr)
+    score, times = noise_score(mono, sr)
     hot = score > thresh
     segs, i, n = [], 0, len(hot)
     while i < n:
@@ -225,16 +226,15 @@ def rubbing_segments(mono, sr=48000, thresh=0.45, min_dur=0.05):
 
 
 def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0,
-             rub_strength=1.0):
+             noise_strength=1.0):
     """Automatic best-mic mixer: pick the cleanest mic per moment, gate the rest,
     crossfade switches, level-match. Unlike fuse() this does NOT sum every mic —
-    a mic with rubbing/handling simply isn't selected while it's bad, so the
-    artifact is excluded (not just attenuated). Output stays leveled because mics
-    are RMS-matched and the per-mic gain envelopes sum to 1.
+    a mic with handling/low-freq noise simply isn't selected while it's bad, so
+    the artifact is excluded (not just attenuated). Output stays leveled because
+    mics are RMS-matched and the per-mic gain envelopes sum to 1.
 
-    Per window: score each mic by SNR x speech-likeness x transient/clip guards;
-    softly favor the winner; smooth the choice over time to avoid chattering;
-    upsample to a sample-rate gain envelope and crossfade.
+    Per window: score each mic by SNR x speech-likeness x noise/transient/clip
+    guards; hard-pick the winner with hysteresis; crossfade switches.
     """
     exclude = set(exclude or [])
     mics = [x for i, x in enumerate(audios) if i not in exclude]
@@ -267,9 +267,9 @@ def autopick(audios, sr=48000, exclude=None, win_ms=46.0, smooth_ms=120.0,
         ref = np.median(snr) + 1e-9
         has_signal = snr / (snr + ref)                    # 0..1, saturates loudness
         q = _frame_quality(mag, mag2)                     # speechiness x transient guard
-        rub, _ = rubbing_score(m, sr)                     # dedicated rubbing detector
-        rub_pen = np.clip(1.0 - rub_strength * rub, 0.0, 1.0)
-        s = q * has_signal * rub_pen                      # rubbing mic loses here
+        noise, _ = noise_score(m, sr)                     # handling / low-freq noise detector
+        noise_pen = np.clip(1.0 - noise_strength * noise, 0.0, 1.0)
+        s = q * has_signal * noise_pen                    # noisy mic loses here
         # resample stft-frame score to our window grid
         xp = np.linspace(0, 1, len(s)); xq = np.linspace(0, 1, nfr)
         scores.append(np.interp(xq, xp, s))

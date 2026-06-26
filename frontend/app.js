@@ -38,10 +38,10 @@ const state = {
   mergeChain: defaultChain(), // merge mode's own chain
   micInclude: [],             // bool per track: include in merge
   fuseMode: 'blend',          // 'blend' | 'autopick'
-  rubStrength: 1.0,
-  showRub: false,
+  noiseStrength: 1.0,
+  showNoise: false,
 };
-const rubIds = new Set();     // wavesurfer region ids that are rubbing highlights
+const noiseIds = new Set();   // wavesurfer region ids that are noise highlights
 
 // the chain currently being edited (per-track in normal, shared in merge)
 function activeChain() {
@@ -78,10 +78,10 @@ const ws = WaveSurfer.create({
   cursorColor: '#e8eefc', height: 150, normalize: true, plugins: [regions],
 });
 regions.enableDragSelection({ color: 'rgba(246,181,69,.22)' });
-// keep only one TRIM region at a time (rubbing highlights are exempt)
+// keep only one TRIM region at a time (noise highlights are exempt)
 regions.on('region-created', (r) => {
-  if (rubIds.has(r.id)) return;  // a highlight, not a user trim
-  regions.getRegions().forEach((x) => { if (x !== r && !rubIds.has(x.id)) x.remove(); });
+  if (noiseIds.has(r.id)) return;  // a highlight, not a user trim
+  regions.getRegions().forEach((x) => { if (x !== r && !noiseIds.has(x.id)) x.remove(); });
 });
 
 const audioUrl = (path) => `/api/audio?path=${encodeURIComponent(path)}`;
@@ -121,11 +121,6 @@ function applySession(res) {
   $('#editor').classList.remove('hidden');
   renderTrackList();
   focusTrack(0);
-}
-
-async function loadDefault() {
-  try { applySession(await fetch('/api/default_session').then(checkOk)); }
-  catch { /* no default; wait for user */ }
 }
 
 async function uploadFiles(fileList) {
@@ -170,8 +165,8 @@ function focusTrack(i) {
   $('#ab-clean').disabled = !state.cleaned[i];
   setAB('orig');
   ws.load(audioUrl(state.tracks[i].path));
-  rubIds.clear();  // regions cleared on load; drop stale ids
-  ws.once('ready', () => { if (state.showRub) refreshRubbing(); });
+  noiseIds.clear();  // regions cleared on load; drop stale ids
+  ws.once('ready', () => { if (state.showNoise) refreshNoise(); });
   renderParams();
 }
 
@@ -277,29 +272,29 @@ function chk(label, value, onchange) {
 /* ---------- trim + transport ---------- */
 
 function currentTrim() {
-  const r = regions.getRegions().find((x) => !rubIds.has(x.id));
+  const r = regions.getRegions().find((x) => !noiseIds.has(x.id));
   return r ? [r.start, r.end] : [0, 0];
 }
 
-/* ---------- rubbing highlight ---------- */
+/* ---------- noise highlight ---------- */
 
-function clearRubRegions() {
-  regions.getRegions().forEach((r) => { if (rubIds.has(r.id)) r.remove(); });
-  rubIds.clear();
+function clearNoiseRegions() {
+  regions.getRegions().forEach((r) => { if (noiseIds.has(r.id)) r.remove(); });
+  noiseIds.clear();
 }
-async function refreshRubbing() {
-  clearRubRegions();
-  if (!state.showRub || !state.tracks.length) return;
+async function refreshNoise() {
+  clearNoiseRegions();
+  if (!state.showNoise || !state.tracks.length) return;
   const path = state.tracks[state.focus].path;
   try {
-    const res = await fetch(`/api/rubbing?path=${encodeURIComponent(path)}`).then(checkOk);
+    const res = await fetch(`/api/noise?path=${encodeURIComponent(path)}`).then(checkOk);
     res.segments.forEach(([a, b]) => {
       const reg = regions.addRegion({ start: a, end: b, drag: false, resize: false,
         color: 'rgba(255,107,107,.25)' });
-      rubIds.add(reg.id);
+      noiseIds.add(reg.id);
     });
-    setStatus(`${res.segments.length} rubbing region(s) flagged on ${state.tracks[state.focus].name}`, '');
-  } catch (err) { setStatus('rubbing detect failed: ' + err.message, 'err'); }
+    setStatus(`${res.segments.length} noisy region(s) flagged on ${state.tracks[state.focus].name}`, '');
+  } catch (err) { setStatus('noise detect failed: ' + err.message, 'err'); }
 }
 function setTrimEdge(edge) {
   const r = regions.getRegions()[0];
@@ -344,8 +339,9 @@ async function renderMerge() {
   try {
     const res = await apiJSON('/api/merge', {
       paths: state.tracks.map((t) => t.path),
-      exclude, auto_exclude: false, preclean: $('#preclean').checked,
-      fuse_mode: state.fuseMode, rub_strength: state.rubStrength,
+      exclude, auto_exclude: exclude.length ? false : $('#auto-exclude').checked,
+      preclean: $('#preclean').checked,
+      fuse_mode: state.fuseMode, noise_strength: state.noiseStrength,
       chain: state.mergeChain, trim: currentTrim(),
     });
     state.mergeResult = res.out_path;
@@ -418,17 +414,17 @@ document.querySelectorAll('#fuse-mode button').forEach((b) => {
     $('#fuse-desc').textContent = state.fuseMode === 'autopick'
       ? 'picks the cleanest mic per moment, crossfades, level-matched — excludes bad parts'
       : 'sums every mic (weighted)';
-    $('#rub-row').classList.toggle('hidden', state.fuseMode !== 'autopick');
+    $('#noise-row').classList.toggle('hidden', state.fuseMode !== 'autopick');
   };
 });
-$('#rub-strength').oninput = (e) => {
-  state.rubStrength = parseFloat(e.target.value);
-  $('#rub-val').textContent = state.rubStrength.toFixed(2);
+$('#noise-strength').oninput = (e) => {
+  state.noiseStrength = parseFloat(e.target.value);
+  $('#noise-val').textContent = state.noiseStrength.toFixed(2);
 };
-$('#rub-btn').onclick = () => {
-  state.showRub = !state.showRub;
-  $('#rub-btn').classList.toggle('active', state.showRub);
-  refreshRubbing();
+$('#noise-btn').onclick = () => {
+  state.showNoise = !state.showNoise;
+  $('#noise-btn').classList.toggle('active', state.showNoise);
+  refreshNoise();
 };
 
 // dropzone + pickers
@@ -476,7 +472,5 @@ window.addEventListener('keydown', (ev) => {
   const fn = SHORTCUTS[key];
   if (fn) { ev.preventDefault(); fn(); }
 });
-
-loadDefault();
 
 export { state, ws, focusTrack };

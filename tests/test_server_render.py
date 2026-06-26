@@ -62,7 +62,7 @@ def test_merge_auto_excludes_derived(write_wav):
     c_mix = write_wav("trlr.wav", mix_stereo)
     client = TestClient(server.app)
     r = client.post("/api/merge", json={
-        "paths": [a, b, c_mix], "exclude": [],
+        "paths": [a, b, c_mix], "exclude": [], "auto_exclude": True,
         "chain": [{"type": "noisereduce", "params": {"prop_decrease": 0.5}}], "trim": [0, 0],
     })
     assert r.status_code == 200

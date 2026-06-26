@@ -42,9 +42,10 @@
     <section id="workspace">
       <div id="empty-state" class="empty">
         <div class="empty-icon">◑</div>
-        <h2>No recording loaded</h2>
-        <p>Drop your shoot's WAV tracks (or the folder) on the left.<br>
-           Your project's <code>files/</code> folder loads automatically.</p>
+        <h2>No audio loaded</h2>
+        <p>Drop a dialogue recording's WAV tracks — or a single file — on the left,
+           or use <b>Choose files</b> / <b>Choose folder</b>.<br>
+           Clean one track at a time, or combine multiple mics into one voice.</p>
       </div>
 
       <div id="editor" class="hidden">
@@ -63,7 +64,7 @@
               <button id="zoom-out" title="Zoom out ([)">−</button>
               <button id="zoom-in" title="Zoom in (])">+</button>
             </div>
-            <button id="rub-btn" class="ghost sm" title="Highlight detected rubbing/handling regions">⚠ highlight rubbing</button>
+            <button id="noise-btn" class="ghost sm" title="Highlight detected handling / low-freq noise regions">⚠ highlight noise</button>
             <span class="hint">drag on waveform to select a region · <b>i</b>/<b>o</b> set in/out</span>
             <button id="clear-trim" class="ghost sm">clear trim</button>
           </div>
@@ -72,19 +73,22 @@
         <div id="merge-panel" class="panel hidden">
           <div class="panel-head">
             <h3>Mics to merge</h3>
-            <label class="check inline"><input id="preclean" type="checkbox" checked> clean each mic before fusing</label>
+            <div class="head-checks">
+              <label class="check inline"><input id="auto-exclude" type="checkbox"> auto-skip duplicate tracks</label>
+              <label class="check inline"><input id="preclean" type="checkbox" checked> clean each mic before fusing</label>
+            </div>
           </div>
           <div class="fuse-mode" id="fuse-mode">
             <button data-fuse="blend" class="active">Blend all</button>
             <button data-fuse="autopick">Auto-pick best mic</button>
             <span class="hint left" id="fuse-desc">sums every mic (weighted)</span>
           </div>
-          <label id="rub-row" class="rub-row hidden">
-            <span class="row"><span>avoid rubbing (sensitivity)</span><span class="val" id="rub-val">1.00</span></span>
-            <input id="rub-strength" type="range" min="0" max="2" step="0.1" value="1">
+          <label id="noise-row" class="rub-row hidden">
+            <span class="row"><span>avoid noisy mic (sensitivity)</span><span class="val" id="noise-val">1.00</span></span>
+            <input id="noise-strength" type="range" min="0" max="2" step="0.1" value="1">
           </label>
           <div id="mic-list" class="mic-list"></div>
-          <p class="hint left">Rubbing/handling can't be auto-removed — if some mics have it, <b>exclude</b> them or <b>Solo</b> the clean one (trim to the region first).</p>
+          <p class="hint left">Noise like handling or wind can't be fully auto-removed — if some mics have it, <b>exclude</b> them or <b>Solo</b> the clean one (trim to the region first). <b>Auto-pick</b> tries this for you.</p>
         </div>
 
         <div class="panel">

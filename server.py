@@ -14,7 +14,6 @@ import processing as P
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND = os.path.join(ROOT, "frontend")
-FILES_DIR = os.path.join(ROOT, "files")
 SAFE_ROOTS = (ROOT, tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir()))
 UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "dialogue-cleaner-uploads")
 
@@ -55,15 +54,6 @@ def session(req: SessionReq):
     return fusion.scan_session(req.paths)
 
 
-@app.get("/api/default_session")
-def default_session():
-    """Auto-load the project's files/ dir on startup so the user sees tracks
-    immediately without typing a path."""
-    if not os.path.isdir(FILES_DIR):
-        return {"tracks": [], "mergeable": False, "reason": "no files/ dir"}
-    return fusion.scan_session([FILES_DIR])
-
-
 @app.post("/api/upload")
 async def upload(files: list[UploadFile] = File(...)):
     """Accept dropped/picked files, store them in a fresh temp session dir,
@@ -90,12 +80,12 @@ def audio(path: str = Query(...)):
     return FileResponse(_safe(path), media_type="audio/wav")
 
 
-@app.get("/api/rubbing")
-def rubbing(path: str = Query(...), thresh: float = 0.45):
-    """Detected cloth/handling-rubbing regions for a track, for waveform overlay."""
+@app.get("/api/noise")
+def noise(path: str = Query(...), thresh: float = 0.45):
+    """Detected handling / low-freq-noise regions for a track, for waveform overlay."""
     a, s = P.load(_safe(path))
     a, s = P.resample(a, s)
-    segs = fusion.rubbing_segments(a.mean(0), s, thresh=thresh)
+    segs = fusion.noise_segments(a.mean(0), s, thresh=thresh)
     return {"segments": segs}
 
 
@@ -164,17 +154,17 @@ def render_all(req: RenderAllReq):
 class MergeReq(BaseModel):
     paths: list[str]
     exclude: list[int] = []
-    auto_exclude: bool = True          # auto-drop detected mixdowns when no manual exclude
+    auto_exclude: bool = False         # opt-in: auto-skip detected duplicate tracks
     preclean: bool = True              # clean each mic BEFORE fusing (per-source)
     fuse_mode: str = "blend"           # "blend" (sum all) | "autopick" (best mic per moment)
-    rub_strength: float = 1.0          # autopick: how hard to avoid rubbing mics (0..2)
+    noise_strength: float = 1.0        # autopick: how hard to avoid noisy mics (0..2)
     chain: list[dict] = []             # ordered [{type, params}]; empty = passthrough
     trim: list[float] = [0.0, 0.0]
 
 
-def _combine(audios, sr, mode, rub_strength=1.0):
+def _combine(audios, sr, mode, noise_strength=1.0):
     if mode == "autopick":
-        return fusion.autopick(audios, sr, rub_strength=rub_strength)
+        return fusion.autopick(audios, sr, noise_strength=noise_strength)
     return fusion.fuse(audios, sr)
 
 
@@ -201,15 +191,15 @@ def merge(req: MergeReq):
     active = [audios[i] for i in active_idx]
 
     # reference "before" = raw combine (so the metric reflects no cleaning)
-    raw = P.trim(_combine(active, sr, req.fuse_mode, req.rub_strength),
+    raw = P.trim(_combine(active, sr, req.fuse_mode, req.noise_strength),
                  sr, req.trim[0], req.trim[1])
     before = P.stats(raw)
 
     if req.preclean and req.chain:
         # clean each mic on its own (voice-specific) THEN combine the clean mics —
-        # removes rubbing/noise per source before it gets summed/selected
+        # removes noise per source before it gets summed/selected
         cleaned = [_denoise(a, sr, req.chain) for a in active]
-        out = _combine(cleaned, sr, req.fuse_mode, req.rub_strength)
+        out = _combine(cleaned, sr, req.fuse_mode, req.noise_strength)
         out = P.trim(out, sr, req.trim[0], req.trim[1])
     else:
         # combine raw, then clean the result

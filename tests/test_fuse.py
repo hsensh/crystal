@@ -45,9 +45,9 @@ def test_autopick_excludes_rubbing_mic():
     assert hf_rms(out[seg]) < 0.05 * hf_rms(dirty[0][seg])  # rubbing excluded
 
 
-def test_rubbing_detector_flags_lowfreq_handling():
-    """rubbing_score high on a low-freq cloth/handling burst, low on clean voice;
-    rubbing_segments locates it."""
+def test_noise_detector_flags_lowfreq_handling():
+    """noise_score high on a low-freq handling/rumble burst, low on clean voice;
+    noise_segments locates it."""
     sr = 48000
     t = np.arange(int(3.0 * sr)) / sr
     clean = (0.2 * np.sin(2 * np.pi * 300 * t)).astype("float32")
@@ -57,12 +57,12 @@ def test_rubbing_detector_flags_lowfreq_handling():
     dirty[mid] += 0.6 * np.sin(2 * np.pi * 80 * t[mid]) + 0.3 * rng.standard_normal(mid.stop - mid.start)
     dirty = dirty.astype("float32")
 
-    rc, _ = fusion.rubbing_score(clean, sr)
-    rd, _ = fusion.rubbing_score(dirty, sr)
+    rc, _ = fusion.noise_score(clean, sr)
+    rd, _ = fusion.noise_score(dirty, sr)
     nf = len(rd); lo, hi = nf // 3, 2 * nf // 3
-    assert rd[lo:hi].mean() > 0.4          # rubbing flagged in the burst
+    assert rd[lo:hi].mean() > 0.4          # noise flagged in the burst
     assert rc.mean() < 0.1                 # clean voice not flagged
-    segs = fusion.rubbing_segments(dirty, sr)
+    segs = fusion.noise_segments(dirty, sr)
     assert any(a < 1.5 < b for a, b in segs)  # a segment spans the burst
 
 
