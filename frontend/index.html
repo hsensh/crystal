@@ -19,6 +19,7 @@
       <button data-mode="normal" class="active">Clean tracks</button>
       <button data-mode="merge" id="merge-btn">Merge mics</button>
     </div>
+    <button id="logs-btn" class="ghost" title="View server logs">Logs</button>
     <button id="help-btn" class="ghost" title="Keyboard shortcuts">Shortcuts</button>
   </header>
 
@@ -129,6 +130,17 @@
       <h3>Keyboard shortcuts</h3>
       <div id="shortcuts-body"></div>
       <button id="close-help" class="primary sm">Close</button>
+    </div>
+  </div>
+
+  <div id="logs" class="overlay hidden">
+    <div class="overlay-card logs-card">
+      <h3>Server logs</h3>
+      <pre id="logs-body" class="setup-log logs-body"></pre>
+      <div class="logs-actions">
+        <button id="logs-refresh" class="sm">Refresh</button>
+        <button id="logs-close" class="primary sm">Close</button>
+      </div>
     </div>
   </div>
 

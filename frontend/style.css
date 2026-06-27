@@ -211,6 +211,11 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; f
   white-space: pre-wrap; margin: 0 0 14px; }
 .setup-log:empty { display: none; }
 
+/* ---- logs viewer ---- */
+.logs-card { width: 680px; max-width: 92vw; }
+.logs-body { max-height: 56vh; margin: 0 0 14px; }
+.logs-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
 /* ---- shortcuts overlay ---- */
 .overlay { position: fixed; inset: 0; background: rgba(5,9,18,.7); display: grid; place-items: center; z-index: 50; }
 .overlay-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; width: 440px; }

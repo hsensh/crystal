@@ -1,11 +1,13 @@
 """FastAPI backend for the dialogue cleaner. Serves the static frontend and
 JSON endpoints that drive processing.py + fusion.py."""
+import logging
 import os
 import shutil
 import tempfile
+import traceback
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -19,8 +21,38 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND = os.path.join(ROOT, "frontend")
 SAFE_ROOTS = (ROOT, tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir()))
 UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "dialogue-cleaner-uploads")
+LOG_FILE = os.path.join(resources.app_support(), "server.log")
 
-app = FastAPI(title="Dialogue Cleaner")
+logging.basicConfig(
+    filename=LOG_FILE, level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+log = logging.getLogger("crystal")
+
+app = FastAPI(title="Crystal")
+
+
+@app.exception_handler(Exception)
+async def _on_error(request: Request, exc: Exception):
+    """Log full traceback to file (the packaged app has no console) and return
+    the real error message so the UI can show it instead of a blank 500."""
+    log.error("error on %s\n%s", request.url.path, traceback.format_exc())
+    return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"})
+
+
+@app.get("/api/logs")
+def logs():
+    """Recent server + startup log lines, for the in-app Logs viewer."""
+    parts = []
+    for f in (LOG_FILE, os.path.join(resources.app_support(), "crash.log")):
+        if os.path.isfile(f):
+            try:
+                with open(f) as fh:
+                    tail = "".join(fh.readlines()[-200:])
+                parts.append(f"==== {os.path.basename(f)} ====\n{tail}")
+            except Exception:  # noqa: BLE001
+                pass
+    return PlainTextResponse("\n\n".join(parts) or "(no logs yet)")
 
 
 @app.middleware("http")

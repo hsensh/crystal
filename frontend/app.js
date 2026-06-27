@@ -489,6 +489,14 @@ $('#shortcuts-body').innerHTML = SHORT.map(([k, d]) => `<div><kbd>${k}</kbd> ${d
 $('#help-btn').onclick = () => $('#shortcuts').classList.toggle('hidden');
 $('#close-help').onclick = () => $('#shortcuts').classList.add('hidden');
 
+async function loadLogs() {
+  try { $('#logs-body').textContent = await fetch('/api/logs').then((r) => r.text()); }
+  catch (e) { $('#logs-body').textContent = 'could not load logs: ' + e.message; }
+}
+$('#logs-btn').onclick = () => { $('#logs').classList.remove('hidden'); loadLogs(); };
+$('#logs-refresh').onclick = loadLogs;
+$('#logs-close').onclick = () => $('#logs').classList.add('hidden');
+
 const SHORTCUTS = {
   ' ': () => ws.playPause(),
   '[': () => $('#zoom-out').onclick(),
