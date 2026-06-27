@@ -14,9 +14,11 @@ jobs:
         include:
           - os: macos-latest
             sep: ":"
+            binext: ""
             artifact: DialogueCleaner-macos
           - os: windows-latest
             sep: ";"
+            binext: ".exe"
             artifact: DialogueCleaner-windows
     runs-on: ${{ matrix.os }}
     steps:
@@ -31,15 +33,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install fastapi uvicorn python-multipart numpy scipy soundfile noisereduce pywebview pyinstaller
 
+      - name: Fetch ffmpeg + uv (bundled binaries)
+        shell: bash
+        run: |
+          mkdir -p bin
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install ffmpeg uv
+            cp "$(which ffmpeg)" bin/ffmpeg
+            cp "$(which uv)" bin/uv
+          else
+            choco install ffmpeg -y --no-progress
+            cp "$(which ffmpeg)" bin/ffmpeg.exe
+            curl -L -o uv.zip https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip
+            7z e uv.zip -obin uv.exe -y
+          fi
+
       - name: Build app
+        shell: bash
         run: >
           pyinstaller --noconfirm --windowed --name DialogueCleaner
           --add-data "frontend${{ matrix.sep }}frontend"
           --add-data "models${{ matrix.sep }}models"
+          --add-binary "bin/ffmpeg${{ matrix.binext }}${{ matrix.sep }}."
+          --add-binary "bin/uv${{ matrix.binext }}${{ matrix.sep }}."
           --collect-all webview
           --hidden-import server
           --hidden-import fusion
           --hidden-import processing
+          --hidden-import resources
           desktop.py
 
       - name: Upload artifact

@@ -11,6 +11,9 @@ from pydantic import BaseModel
 
 import fusion
 import processing as P
+import resources
+
+resources.add_site_to_path()  # make any first-run-installed packages importable
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND = os.path.join(ROOT, "frontend")
@@ -47,6 +50,18 @@ def _safe(path):
 
 class SessionReq(BaseModel):
     paths: list[str]
+
+
+@app.get("/api/resources")
+def resources_status():
+    """Resource availability + any in-progress first-run install state."""
+    return {**resources.status(), "install": resources.install_state()}
+
+
+@app.post("/api/resources/install")
+def resources_install():
+    resources.start_install()
+    return {"started": True}
 
 
 @app.post("/api/session")

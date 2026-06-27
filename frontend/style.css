@@ -196,6 +196,22 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; f
 
 .hidden { display: none !important; }
 
+/* ---- first-run setup screen ---- */
+.setup-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 34px 38px; width: 480px; text-align: center; }
+.setup-logo { font-size: 46px; color: var(--accent); margin-bottom: 8px; }
+.setup-card h2 { margin: 0 0 6px; }
+.setup-sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+.res-list { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.res-list li { padding: 9px 12px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; }
+.res-list li.ok { color: var(--good); border-color: rgba(56,211,159,.3); }
+.res-list li.pending { color: var(--muted); }
+.res-list li.work { color: var(--accent); border-color: var(--accent); }
+.setup-log { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px;
+  font-size: 11.5px; color: var(--muted); text-align: left; max-height: 120px; overflow: auto;
+  white-space: pre-wrap; margin: 0 0 14px; }
+.setup-log:empty { display: none; }
+
 /* ---- shortcuts overlay ---- */
 .overlay { position: fixed; inset: 0; background: rgba(5,9,18,.7); display: grid; place-items: center; z-index: 50; }
 .overlay-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; width: 440px; }

@@ -13,6 +13,15 @@ import soundfile as sf
 
 SR = 48000
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+
+
+def _ffmpeg():
+    """Resolve the ffmpeg binary (bundled in the packaged app, else PATH)."""
+    try:
+        import resources
+        return resources.ffmpeg_path()
+    except Exception:  # noqa: BLE001
+        return "ffmpeg"
 RNN_MODELS = {
     "marathon-prescription (general, balanced)": "mp.rnnn",
     "beguiling-drafter (general)": "bd.rnnn",
@@ -156,7 +165,7 @@ def m_leveler(audio, sr, lvl_max_gain_db=12.0, lvl_smooth_ms=400.0, **_):
         op = os.path.join(d, "out.wav")
         sf.write(ip, audio.T, sr, subtype="FLOAT")
         subprocess.run(
-            ["ffmpeg", "-y", "-v", "error", "-i", ip,
+            [_ffmpeg(), "-y", "-v", "error", "-i", ip,
              "-af", f"dynaudnorm=f={f}:g=3:p=0.95:m={m:.2f}", op],
             check=True,
         )
@@ -171,7 +180,7 @@ def m_rnnoise(audio, sr, rnn_model="mp.rnnn", rnn_mix=1.0, **_):
         op = os.path.join(d, "out.wav")
         sf.write(ip, audio.T, sr, subtype="FLOAT")
         subprocess.run(
-            ["ffmpeg", "-y", "-v", "error", "-i", ip,
+            [_ffmpeg(), "-y", "-v", "error", "-i", ip,
              "-af", f"arnndn=m={model_path}", op],
             check=True,
         )

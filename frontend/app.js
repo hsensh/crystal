@@ -513,4 +513,54 @@ window.addEventListener('keydown', (ev) => {
   if (fn) { ev.preventDefault(); fn(); }
 });
 
+/* ---------- first-run resource setup ---------- */
+
+const RES_ITEMS = [
+  ['ffmpeg', 'Audio engine (ffmpeg)'],
+  ['torch', 'Speech-AI runtime (PyTorch)'],
+  ['deepfilternet', 'DeepFilterNet model'],
+];
+
+function renderResList(s, working) {
+  $('#res-list').innerHTML = RES_ITEMS.map(([k, label]) => {
+    const cls = s[k] ? 'ok' : (working ? 'work' : 'pending');
+    const mark = s[k] ? '✓' : (working ? '…' : '○');
+    return `<li class="${cls}">${mark} ${label}</li>`;
+  }).join('');
+}
+
+async function pollResources() {
+  let s;
+  try { s = await fetch('/api/resources').then((r) => r.json()); }
+  catch { setTimeout(pollResources, 2000); return; }
+  renderResList(s, s.install && s.install.running);
+  $('#setup-log').textContent = (s.install && s.install.log || []).join('\n');
+  if (s.ready) { setTimeout(() => $('#setup').classList.add('hidden'), 700); return; }
+  if (s.install && s.install.error) {
+    $('#setup-go').classList.remove('hidden');
+    $('#setup-go').disabled = false; $('#setup-go').textContent = 'Retry';
+    return;
+  }
+  setTimeout(pollResources, 1500);
+}
+
+async function beginInstall() {
+  $('#setup-go').classList.add('hidden');
+  await fetch('/api/resources/install', { method: 'POST' });
+  pollResources();
+}
+$('#setup-go').onclick = beginInstall;
+
+async function checkResources() {
+  let s;
+  try { s = await fetch('/api/resources').then((r) => r.json()); }
+  catch { return; }                       // not the desktop build; skip
+  if (s.ready) return;                     // everything present, no screen
+  $('#setup').classList.remove('hidden');  // dedicated first-run download screen
+  renderResList(s, false);
+  beginInstall();                          // auto-start the download
+}
+
+checkResources();
+
 export { state, ws, focusTrack };

@@ -10,39 +10,10 @@ Packaged:    see BUILD.md (PyInstaller, per-OS).
 """
 import os
 import socket
-import subprocess
 import sys
 import threading
 import time
 import urllib.request
-
-HEAVY = ["torch", "torchaudio", "deepfilternet"]
-
-
-def _missing_heavy():
-    import importlib.util
-    return [m for m in HEAVY if importlib.util.find_spec(m.replace("-", "_")) is None
-            and importlib.util.find_spec("df" if m == "deepfilternet" else m) is None]
-
-
-def ensure_heavy(status=print):
-    """Install torch/torchaudio/DeepFilterNet on first run if absent.
-
-    Dev / venv builds: pip into the current interpreter. Frozen builds bundle a
-    Python + pip and install into a writable app-support dir (see BUILD.md).
-    """
-    missing = _missing_heavy()
-    if not missing:
-        return True
-    status(f"First run: installing {', '.join(missing)} (one-time, large download)…")
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "install", *missing], check=True)
-        status("Install complete.")
-        return True
-    except Exception as e:  # noqa: BLE001 — surface, don't crash the app
-        status(f"Could not auto-install ({e}). Leveler + noisereduce still work; "
-               "DeepFilterNet needs torch.")
-        return False
 
 
 def _free_port():
@@ -72,7 +43,8 @@ def _wait_up(url, timeout=30.0):
 def main():
     # run from the app's own directory so server:app + frontend/ resolve
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    ensure_heavy()
+    import resources
+    resources.add_site_to_path()  # first-run-installed deps become importable
     port = _free_port()
     threading.Thread(target=_serve, args=(port,), daemon=True).start()
     url = f"http://127.0.0.1:{port}/"
