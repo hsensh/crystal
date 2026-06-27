@@ -32,12 +32,32 @@ log = logging.getLogger("crystal")
 app = FastAPI(title="Crystal")
 
 
+def _friendly(exc: Exception) -> str:
+    """Plain-language message for end users (raw detail still goes to the logs)."""
+    t = f"{type(exc).__name__}: {exc}".lower()
+    if "torch" in t or "no module named 'df'" in t or "deepfilternet" in t:
+        return ("The speech-AI engine isn't ready yet. If this is a fresh install, "
+                "let the first-run download finish, then try again.")
+    if "ffmpeg" in t or ("returned non-zero" in t and "dynaudnorm" in t) or "arnndn" in t:
+        return ("The audio engine (ffmpeg) couldn't run on this machine. "
+                "Reinstalling the app usually fixes this.")
+    if "init_df" in t or "checkpoint" in t or "download" in t or "urlopen" in t:
+        return ("Couldn't download the DeepFilterNet model. Check your internet "
+                "connection and try again.")
+    if "sr()" in t or "expects" in t and "got" in t:
+        return "There was a sample-rate problem with this audio. Try re-importing it."
+    return "Something went wrong while processing. Open Logs for the technical details."
+
+
 @app.exception_handler(Exception)
 async def _on_error(request: Request, exc: Exception):
-    """Log full traceback to file (the packaged app has no console) and return
-    the real error message so the UI can show it instead of a blank 500."""
+    """Log full traceback to file (the packaged app has no console) and return a
+    friendly message for the UI plus the raw detail for the Logs viewer."""
     log.error("error on %s\n%s", request.url.path, traceback.format_exc())
-    return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"})
+    return JSONResponse(status_code=500, content={
+        "message": _friendly(exc),
+        "detail": f"{type(exc).__name__}: {exc}",
+    })
 
 
 @app.get("/api/logs")

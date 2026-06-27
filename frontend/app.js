@@ -70,9 +70,9 @@ const apiJSON = (path, body) =>
                 body: JSON.stringify(body) }).then(checkOk);
 async function checkOk(r) {
   if (!r.ok) {
-    let detail = r.statusText;
-    try { detail = (await r.json()).detail || detail; } catch { /* noop */ }
-    throw new Error(`${r.status}: ${detail}`);
+    let msg = r.statusText;
+    try { const b = await r.json(); msg = b.message || b.detail || msg; } catch { /* noop */ }
+    throw new Error(msg);                       // friendly message; full detail is in Logs
   }
   return r.json();
 }
