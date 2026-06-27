@@ -19,8 +19,12 @@ resources.add_site_to_path()  # make any first-run-installed packages importable
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND = os.path.join(ROOT, "frontend")
-SAFE_ROOTS = (ROOT, tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir()))
-UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "dialogue-cleaner-uploads")
+# Outputs must go to a writable location — in a packaged .app, ROOT is inside the
+# read-only bundle. Use the per-user app-support dir.
+OUT_DIR = os.path.join(resources.app_support(), "output")
+UPLOAD_ROOT = os.path.join(tempfile.gettempdir(), "crystal-uploads")
+SAFE_ROOTS = (ROOT, OUT_DIR, resources.app_support(),
+              tempfile.gettempdir(), os.path.realpath(tempfile.gettempdir()))
 LOG_FILE = os.path.join(resources.app_support(), "server.log")
 
 logging.basicConfig(
@@ -180,9 +184,6 @@ if os.path.isdir(FRONTEND):
     app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
 
 
-OUT_DIR = os.path.join(ROOT, "output")
-
-
 class RenderReq(BaseModel):
     path: str
     chain: list[dict] = []  # ordered [{type, params}]; empty = passthrough
@@ -301,13 +302,18 @@ def merge(req: MergeReq):
 
 class ExportReq(BaseModel):
     src: str
-    dest_dir: str
+    dest_dir: str = ""
 
 
 @app.post("/api/export")
 def export(req: ExportReq):
     src = _safe(req.src)
-    os.makedirs(req.dest_dir, exist_ok=True)
-    dest = os.path.join(req.dest_dir, os.path.basename(src))
+    # default + relative dest_dir go to a user-visible folder (the bundle CWD is
+    # read-only in a packaged app)
+    dest_dir = req.dest_dir
+    if not dest_dir or not os.path.isabs(dest_dir):
+        dest_dir = os.path.join(os.path.expanduser("~"), "Documents", "Crystal Exports")
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, os.path.basename(src))
     shutil.copy2(src, dest)
     return {"dest": dest}

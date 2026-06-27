@@ -135,6 +135,19 @@
     </div>
   </div>
 
+  <div id="errbox" class="overlay hidden">
+    <div class="overlay-card logs-card">
+      <h3>Something went wrong</h3>
+      <p id="err-friendly" class="setup-sub"></p>
+      <pre id="err-body" class="setup-log logs-body"></pre>
+      <div class="logs-actions">
+        <button id="err-copy" class="sm">Copy</button>
+        <button id="err-logs" class="sm">Open logs</button>
+        <button id="err-close" class="primary sm">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="logs" class="overlay hidden">
     <div class="overlay-card logs-card">
       <h3>Server logs</h3>

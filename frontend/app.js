@@ -70,11 +70,20 @@ const apiJSON = (path, body) =>
                 body: JSON.stringify(body) }).then(checkOk);
 async function checkOk(r) {
   if (!r.ok) {
-    let msg = r.statusText;
-    try { const b = await r.json(); msg = b.message || b.detail || msg; } catch { /* noop */ }
-    throw new Error(msg);                       // friendly message; full detail is in Logs
+    let msg = r.statusText, detail = '';
+    try { const b = await r.json(); msg = b.message || b.detail || msg; detail = b.detail || ''; }
+    catch { /* noop */ }
+    const e = new Error(msg); e.detail = detail; throw e;  // friendly + technical
   }
   return r.json();
+}
+
+function showError(err) {
+  const friendly = err.message || 'Unexpected error';
+  setStatus(friendly, 'err');                   // short line stays
+  $('#err-friendly').textContent = friendly;
+  $('#err-body').textContent = err.detail || friendly;
+  $('#errbox').classList.remove('hidden');      // full text in a modal
 }
 
 function setStatus(msg, cls = '') {
@@ -331,7 +340,7 @@ async function renderFocus() {
     renderTrackList();
     $('#ab-clean').disabled = false;
     setAB('clean');
-  } catch (err) { setStatus('error: ' + err.message, 'err'); }
+  } catch (err) { showError(err); }
 }
 
 async function renderAll() {
@@ -344,7 +353,7 @@ async function renderAll() {
     document.querySelectorAll('#track-list li').forEach((li, i) => { if (!res.results[i].ok) li.classList.add('error'); });
     const fails = res.results.filter((r) => !r.ok).length;
     setStatus(`rendered ${res.results.length - fails}/${res.results.length}` + (fails ? ` · ${fails} failed` : ''), fails ? 'err' : '');
-  } catch (err) { setStatus('error: ' + err.message, 'err'); }
+  } catch (err) { showError(err); }
 }
 
 async function renderMerge() {
@@ -368,7 +377,7 @@ async function renderMerge() {
     showResult(res, `Merged from: ${usedNames}`);
     $('#ab-clean').disabled = false;     // enable A/B for the merge result
     setAB('clean');                       // jump to the cleaned preview
-  } catch (err) { setStatus('error: ' + err.message, 'err'); }
+  } catch (err) { showError(err); }
 }
 
 function showResult(res, title) {
@@ -385,8 +394,8 @@ function showResult(res, title) {
 async function doExport() {
   const src = state.mode === 'merge' ? state.mergeResult : state.cleaned[state.focus];
   if (!src) { setStatus('nothing rendered yet — Render first', 'err'); return; }
-  try { const res = await apiJSON('/api/export', { src, dest_dir: 'output/export' }); setStatus('exported → ' + res.dest, ''); }
-  catch (err) { setStatus('error: ' + err.message, 'err'); }
+  try { const res = await apiJSON('/api/export', { src }); setStatus('exported → ' + res.dest, ''); }
+  catch (err) { showError(err); }
 }
 
 /* ---------- A/B + mode ---------- */
@@ -493,6 +502,18 @@ async function loadLogs() {
   try { $('#logs-body').textContent = await fetch('/api/logs').then((r) => r.text()); }
   catch (e) { $('#logs-body').textContent = 'could not load logs: ' + e.message; }
 }
+$('#err-close').onclick = () => $('#errbox').classList.add('hidden');
+$('#err-logs').onclick = () => { $('#errbox').classList.add('hidden'); $('#logs').classList.remove('hidden'); loadLogs(); };
+$('#err-copy').onclick = async () => {
+  const text = $('#err-body').textContent;
+  try { await navigator.clipboard.writeText(text); $('#err-copy').textContent = 'Copied'; }
+  catch {
+    const r = document.createRange(); r.selectNodeContents($('#err-body'));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    $('#err-copy').textContent = 'Selected';
+  }
+  setTimeout(() => { $('#err-copy').textContent = 'Copy'; }, 1500);
+};
 $('#logs-btn').onclick = () => { $('#logs').classList.remove('hidden'); loadLogs(); };
 $('#logs-refresh').onclick = loadLogs;
 $('#logs-close').onclick = () => $('#logs').classList.add('hidden');

@@ -67,6 +67,16 @@ jobs:
           --hidden-import fusion
           --hidden-import processing
           --hidden-import resources
+          --hidden-import pickletools
+          --hidden-import pickle
+          --hidden-import copyreg
+          --hidden-import dis
+          --hidden-import ast
+          --hidden-import lzma
+          --hidden-import bz2
+          --hidden-import sqlite3
+          --hidden-import importlib.metadata
+          --hidden-import importlib.resources
           desktop.py
 
       - name: Package
