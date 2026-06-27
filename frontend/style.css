@@ -189,6 +189,7 @@ button.ghost { background: transparent; }
 button.round {
   width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
+}
 button.sm { padding: 6px 12px; font-size: 12px; }
 kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; font-size: 11px; margin-left: 5px; }
 
