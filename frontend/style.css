@@ -212,8 +212,9 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; f
 .setup-log:empty { display: none; }
 
 /* ---- logs viewer ---- */
+.top-actions { display: flex; gap: 8px; align-items: center; }
 .logs-card { width: 680px; max-width: 92vw; }
-.logs-body { max-height: 56vh; margin: 0 0 14px; }
+.logs-body { max-height: 56vh; margin: 0 0 14px; user-select: text; -webkit-user-select: text; cursor: text; }
 .logs-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ---- shortcuts overlay ---- */

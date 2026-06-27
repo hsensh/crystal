@@ -60,6 +60,18 @@ async def _on_error(request: Request, exc: Exception):
     })
 
 
+@app.post("/api/logs/clear")
+def logs_clear():
+    """Wipe the log files so the next reproduction shows only fresh entries."""
+    for f in (LOG_FILE, os.path.join(resources.app_support(), "crash.log")):
+        try:
+            open(f, "w").close()
+        except Exception:  # noqa: BLE001
+            pass
+    log.info("logs cleared")
+    return {"cleared": True}
+
+
 @app.get("/api/logs")
 def logs():
     """Recent server + startup log lines, for the in-app Logs viewer."""

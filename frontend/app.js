@@ -496,6 +496,20 @@ async function loadLogs() {
 $('#logs-btn').onclick = () => { $('#logs').classList.remove('hidden'); loadLogs(); };
 $('#logs-refresh').onclick = loadLogs;
 $('#logs-close').onclick = () => $('#logs').classList.add('hidden');
+$('#logs-copy').onclick = async () => {
+  const text = $('#logs-body').textContent;
+  try { await navigator.clipboard.writeText(text); $('#logs-copy').textContent = 'Copied'; }
+  catch { /* fallback: select the text so the user can ⌘C */
+    const r = document.createRange(); r.selectNodeContents($('#logs-body'));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    $('#logs-copy').textContent = 'Selected';
+  }
+  setTimeout(() => { $('#logs-copy').textContent = 'Copy'; }, 1500);
+};
+$('#logs-clear').onclick = async () => {
+  await fetch('/api/logs/clear', { method: 'POST' });
+  loadLogs();
+};
 
 const SHORTCUTS = {
   ' ': () => ws.playPause(),
