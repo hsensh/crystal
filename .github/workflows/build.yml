@@ -18,10 +18,12 @@ jobs:
           - os: macos-latest
             sep: ":"
             binext: ""
+            icon: icons/crystal.icns
             zip: Crystal-macos.zip
           - os: windows-latest
             sep: ";"
             binext: ".exe"
+            icon: icons/crystal.ico
             zip: Crystal-windows.zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -55,6 +57,7 @@ jobs:
         shell: bash
         run: >
           pyinstaller --noconfirm --windowed --name Crystal
+          --icon "${{ matrix.icon }}"
           --add-data "frontend${{ matrix.sep }}frontend"
           --add-data "models${{ matrix.sep }}models"
           --add-binary "bin/ffmpeg${{ matrix.binext }}${{ matrix.sep }}."

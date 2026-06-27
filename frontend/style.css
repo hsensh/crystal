@@ -1,12 +1,13 @@
 :root {
-  --bg: #0b1120;
-  --panel: #131c31;
-  --panel-2: #1b2740;
-  --line: #2a3a5c;
-  --text: #e8eefc;
-  --muted: #93a4c8;
-  --accent: #5b8cff;
-  --accent-2: #3b6ef5;
+  /* palette derived from the Crystal logo (deep navy facets, light-blue edges) */
+  --bg: #0B0F1A;
+  --panel: #0F2035;
+  --panel-2: #152C44;
+  --line: #1E3852;
+  --text: #EAF4FF;
+  --muted: #8FA8CC;
+  --accent: #7EB8F7;
+  --accent-2: #3B82F6;
   --good: #38d39f;
   --warn: #f6b545;
   --bad: #ff6b6b;
@@ -23,14 +24,13 @@ body {
 /* ---- header ---- */
 header {
   display: flex; align-items: center; gap: 20px;
-  padding: 14px 22px; background: linear-gradient(180deg, #142039, #101830);
+  padding: 14px 22px; background: linear-gradient(180deg, #142C46, #0C1828);
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
 .logo {
-  font-size: 26px; color: var(--accent);
-  background: var(--panel-2); width: 42px; height: 42px; border-radius: 10px;
-  display: grid; place-items: center;
+  width: 40px; height: 40px; display: block;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px;
 }
 h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
 .sub { margin: 0; font-size: 12px; color: var(--muted); }
@@ -83,14 +83,14 @@ main { display: flex; height: calc(100vh - 71px); }
 #track-list li.active { background: var(--panel-2); border-color: var(--accent); }
 #track-list li .t-name { font-weight: 600; }
 #track-list li .t-meta { font-size: 11.5px; color: var(--muted); display: flex; gap: 8px; }
-#track-list li.done .t-name::after { content: " ✓"; color: var(--good); }
+#track-list li.done .t-name::after { content: " · cleaned"; color: var(--good); }
 #track-list li.error { color: var(--bad); }
 #track-list li.excluded { opacity: .55; }
 #track-list li.excluded .t-name::after { content: " (mixdown — excluded)"; color: var(--warn); font-weight: 400; font-size: 11px; }
 
 /* ---- empty state ---- */
 .empty { text-align: center; color: var(--muted); margin-top: 12vh; }
-.empty-icon { font-size: 54px; color: var(--line); }
+.empty-icon { width: 84px; height: 84px; opacity: .85; }
 .empty h2 { color: var(--text); margin: 10px 0 6px; }
 .empty code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; color: var(--accent); }
 
@@ -189,8 +189,6 @@ button.ghost { background: transparent; }
 button.round {
   width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
-}
-button.round.play { padding-left: 3px; }  /* optically center the ▶ triangle */
 button.sm { padding: 6px 12px; font-size: 12px; }
 kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; font-size: 11px; margin-left: 5px; }
 
@@ -199,7 +197,7 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 5px; f
 /* ---- first-run setup screen ---- */
 .setup-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
   padding: 34px 38px; width: 480px; text-align: center; }
-.setup-logo { font-size: 46px; color: var(--accent); margin-bottom: 8px; }
+.setup-logo { width: 72px; height: 72px; margin: 0 auto 8px; display: block; }
 .setup-card h2 { margin: 0 0 6px; }
 .setup-sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
 .res-list { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; display: flex; flex-direction: column; gap: 8px; }

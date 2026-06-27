@@ -116,7 +116,7 @@ function applySession(res) {
 
   const badge = $('#session-badge');
   if (!state.tracks.length) {
-    badge.className = 'badge warn'; badge.textContent = '⚠ ' + (res.reason || 'no tracks found');
+    badge.className = 'badge warn'; badge.textContent = (res.reason || 'no tracks found');
     badge.classList.remove('hidden');
     $('#editor').classList.add('hidden');
     $('#empty-state').classList.remove('hidden');
@@ -124,7 +124,7 @@ function applySession(res) {
   }
   if (state.mergeable) {
     badge.className = 'badge ok';
-    badge.textContent = `✓ ${state.tracks.length} tracks · can merge`;
+    badge.textContent = `${state.tracks.length} tracks · can merge`;
   } else {
     badge.className = 'badge warn';
     badge.textContent = `${state.tracks.length} tracks · merge off (${res.reason})`;
@@ -209,7 +209,7 @@ function stageCard(st, idx, chain) {
   const tools = document.createElement('div'); tools.className = 'stage-tools';
   const up = toolBtn('↑', idx === 0, () => move(chain, idx, -1));
   const down = toolBtn('↓', idx === chain.length - 1, () => move(chain, idx, +1));
-  const rm = toolBtn('✕', false, () => { chain.splice(idx, 1); renderParams(); });
+  const rm = toolBtn('×', false, () => { chain.splice(idx, 1); renderParams(); });
   rm.classList.add('rm');
   tools.append(up, down, rm);
   head.append(numEl, name, tools);
@@ -428,8 +428,8 @@ function setMode(mode) {
 /* ---------- wiring ---------- */
 
 $('#play').onclick = () => ws.playPause();
-ws.on('play', () => { $('#play').textContent = '❚❚'; $('#play').classList.remove('play'); });
-ws.on('pause', () => { $('#play').textContent = '▶'; $('#play').classList.add('play'); });
+ws.on('play', () => { $('#play').textContent = 'Pause'; $('#play').classList.remove('play'); });
+ws.on('pause', () => { $('#play').textContent = 'Play'; $('#play').classList.add('play'); });
 $('#zoom-in').onclick = () => ws.zoom((ws.options.minPxPerSec || 0) + 30);
 $('#zoom-out').onclick = () => ws.zoom(Math.max(0, (ws.options.minPxPerSec || 0) - 30));
 $('#clear-trim').onclick = () => regions.clearRegions();
@@ -481,7 +481,7 @@ dz.addEventListener('drop', (e) => { if (e.dataTransfer.files.length) uploadFile
 // help overlay
 const SHORT = [
   ['space', 'play / pause'], ['[ ]', 'zoom out / in'], ['← →', 'seek'],
-  ['i / o', 'set trim in / out'], ['r', 'render'], ['⇧R', 'render all'],
+  ['i / o', 'set trim in / out'], ['r', 'render'], ['Shift+R', 'render all'],
   ['n / p', 'next / prev track'], ['m', 'toggle merge'], ['a', 'A/B'],
   ['e', 'export'], ['?', 'this help'],
 ];
@@ -524,8 +524,8 @@ const RES_ITEMS = [
 function renderResList(s, working) {
   $('#res-list').innerHTML = RES_ITEMS.map(([k, label]) => {
     const cls = s[k] ? 'ok' : (working ? 'work' : 'pending');
-    const mark = s[k] ? '✓' : (working ? '…' : '○');
-    return `<li class="${cls}">${mark} ${label}</li>`;
+    const mark = s[k] ? 'ready' : (working ? 'installing…' : 'pending');
+    return `<li class="${cls}">${label} — ${mark}</li>`;
   }).join('');
 }
 
