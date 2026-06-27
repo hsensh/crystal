@@ -36,7 +36,7 @@ const STAGE_SPECS = {
 };
 
 const newStage = (type) => ({ type, params: { ...STAGE_SPECS[type].defaults } });
-const defaultChain = () => [newStage('deepfilternet')];
+const defaultChain = () => [newStage('leveler'), newStage('deepfilternet')];
 
 const state = {
   tracks: [], focus: 0, mergeable: false, mode: 'normal',
