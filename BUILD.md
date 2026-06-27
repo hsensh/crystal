@@ -26,14 +26,14 @@ GitHub Actions `macos-latest` + `windows-latest`).
 ### PyInstaller (one folder)
 ```bash
 .venv/bin/pip install pyinstaller pywebview
-pyinstaller --noconfirm --windowed --name "DialogueCleaner" \
+pyinstaller --noconfirm --windowed --name "Crystal" \
   --add-data "frontend:frontend" \
   --add-data "models:models" \
   --collect-all webview \
   desktop.py
 ```
-- macOS: produces `dist/DialogueCleaner.app`. Wrap in a `.dmg` (`create-dmg`).
-- Windows: produces `dist/DialogueCleaner/DialogueCleaner.exe`. Wrap with Inno
+- macOS: produces `dist/Crystal.app`. Wrap in a `.dmg` (`create-dmg`).
+- Windows: produces `dist/Crystal/Crystal.exe`. Wrap with Inno
   Setup / NSIS for an installer.
 - Bundle `ffmpeg`: drop the platform binary in and `--add-binary`, or document a
   one-time download on first run alongside torch.
@@ -41,9 +41,10 @@ pyinstaller --noconfirm --windowed --name "DialogueCleaner" \
 ### First-run install in a frozen app
 A frozen build has no `pip` on PATH. Ship a bundled Python's pip and install the
 HEAVY packages into a writable app-support dir, added to `sys.path`:
-- macOS: `~/Library/Application Support/DialogueCleaner/site`
-- Windows: `%APPDATA%\DialogueCleaner\site`
-`desktop.ensure_heavy()` is the hook; point its target there for frozen builds.
+- macOS: `~/Library/Application Support/Crystal/site`
+- Windows: `%APPDATA%\Crystal\site`
+`resources.py` owns this: it bundles `uv` to install the HEAVY packages into the
+site dir (frozen apps have no pip), and the in-app download screen drives it.
 
 ## Signing (avoids security warnings)
 - **macOS:** Apple Developer account ($99/yr). `codesign` the `.app`, then

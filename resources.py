@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 
-APP = "DialogueCleaner"
+APP = "Crystal"
 HEAVY = ["torch", "torchaudio", "deepfilternet"]
 
 

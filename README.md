@@ -1,4 +1,4 @@
-# Dialogue Cleaner
+# Crystal
 
 A local web app for cleaning up recorded dialogue. Import one mic or many, clean
 each track, or combine multiple mics into one clear voice. FastAPI + WaveSurfer.js,
