@@ -45,7 +45,13 @@ def _serve(port):
     try:
         import uvicorn
         import server  # import the app object directly (frozen-safe)
-        uvicorn.run(server.app, host="127.0.0.1", port=port, log_level="warning")
+        # Running in a background thread: uvicorn's default signal handlers only
+        # work on the main thread and raise on Windows. Disable them explicitly.
+        config = uvicorn.Config(server.app, host="127.0.0.1", port=port,
+                                log_level="warning")
+        srv = uvicorn.Server(config)
+        srv.install_signal_handlers = lambda: None
+        srv.run()
     except Exception:  # noqa: BLE001
         _log("server thread crashed:\n" + traceback.format_exc())
 
