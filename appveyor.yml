@@ -1,0 +1,62 @@
+# Windows build for Crystal on AppVeyor (free, no GitHub Actions needed).
+# Produces Crystal-windows.zip as a downloadable build artifact.
+# Setup once: https://ci.appveyor.com -> New Project -> pick the GitHub repo.
+
+image: Visual Studio 2022
+
+environment:
+  PYTHON: "C:\\Python311-x64"
+
+install:
+  # Python 3.11 is preinstalled on the VS2022 image at C:\Python311-x64
+  - set PATH=%PYTHON%;%PYTHON%\Scripts;%PATH%
+  - python --version
+  - python -m pip install --upgrade pip
+  - pip install fastapi uvicorn python-multipart numpy scipy soundfile noisereduce pywebview pyinstaller
+  # pywebview native window backend on Windows needs pythonnet + clr_loader
+  - pip install pythonnet clr_loader
+  # ffmpeg + uv bundled binaries
+  - mkdir bin
+  - choco install ffmpeg -y --no-progress
+  - for /f "delims=" %%i in ('where ffmpeg') do copy "%%i" bin\ffmpeg.exe
+  - curl -L -o uv.zip https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip
+  - 7z e uv.zip -obin uv.exe -y
+
+build_script:
+  - >
+    pyinstaller --noconfirm --windowed --name Crystal
+    --icon icons/crystal.ico
+    --add-data "frontend;frontend"
+    --add-data "models;models"
+    --add-binary "bin/ffmpeg.exe;."
+    --add-binary "bin/uv.exe;."
+    --collect-all webview
+    --collect-all clr_loader
+    --collect-all pythonnet
+    --hidden-import server
+    --hidden-import fusion
+    --hidden-import processing
+    --hidden-import resources
+    --hidden-import pickletools
+    --hidden-import pickle
+    --hidden-import copyreg
+    --hidden-import dis
+    --hidden-import ast
+    --hidden-import lzma
+    --hidden-import bz2
+    --hidden-import sqlite3
+    --hidden-import importlib.metadata
+    --hidden-import importlib.resources
+    desktop.py
+
+after_build:
+  - cd dist
+  - 7z a ..\Crystal-windows.zip Crystal
+  - cd ..
+
+artifacts:
+  - path: Crystal-windows.zip
+    name: Crystal-windows
+
+# no test phase
+test: off
